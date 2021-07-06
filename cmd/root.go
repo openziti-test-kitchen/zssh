@@ -69,16 +69,15 @@ var (
 				AppData:        nil,
 			}
 			svc, err := ctx.DialWithOptions("zssh", dialOptions)
-				if err != nil {
-					panic(fmt.Sprintf("error when dialing service name %s. %v", "zssh", err))
-
-					factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
-					zclient, err := zsshlib.Dial(factory.Config(), svc)
-					if err != nil {
-						panic(err)
-					}
-					zsshlib.RemoteShell(factory, zclient)
-				}
+			if err != nil {
+				panic(fmt.Sprintf("error when dialing service name %s. %v", "zssh", err))
+			}
+			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
+			zclient, err := zsshlib.Dial(factory.Config(), svc)
+			if err != nil {
+				panic(err)
+			}
+			zsshlib.RemoteShell(factory, zclient)
 		},
 
 	}
