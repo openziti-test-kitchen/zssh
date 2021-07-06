@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/openziti/fablab/kernel/model"
 	"github.com/openziti/foundation/util/info"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
@@ -55,7 +55,8 @@ func KillService(factory SshConfigFactory, name string) error {
 	return RemoteKill(factory, fmt.Sprintf("/home/%s/fablab/bin/%s", factory.User(), name))
 }
 
-func RemoteShell(factory SshConfigFactory) error {
+func RemoteShell(factory SshConfigFactory, client *ssh.Client) error {
+	/*
 	config := factory.Config()
 
 	logrus.Infof("shell for [%s]", factory.Address())
@@ -64,6 +65,7 @@ func RemoteShell(factory SshConfigFactory) error {
 	if err != nil {
 		return err
 	}
+	*/
 
 	session, err := client.NewSession()
 	if err != nil {
@@ -100,6 +102,14 @@ func RemoteShell(factory SshConfigFactory) error {
 	}
 
 	return nil
+}
+
+func Dial( config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
+	c, chans, reqs, err := ssh.NewClientConn(conn, "", config)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.NewClient(c, chans, reqs), nil
 }
 
 func RemoteConsole(factory SshConfigFactory, cmd string) error {
@@ -378,16 +388,13 @@ type SshConfigFactoryImpl struct {
 	authMethods     []ssh.AuthMethod
 }
 
-func NewSshConfigFactoryImpl(m *model.Model, host string) *SshConfigFactoryImpl {
-	user := m.Variables.Must("credentials", "zssh", "username").(string)
-	keyPath, _ := m.Variables.Must("credentials", "zssh", "key_path").(string)
+func NewSshConfigFactoryImpl(user string, keyPath string) *SshConfigFactoryImpl {
 	factory := &SshConfigFactoryImpl{
 		user:    user,
-		host:    host,
+		host:    "",
 		port:    22,
 		keyPath: keyPath,
 	}
-
 	return factory
 }
 
