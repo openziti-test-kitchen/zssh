@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/spf13/cobra"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -16,7 +16,6 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	log = pfxlog.Logger()
 	ZConfig string
 	SshKeyPath string
 
@@ -63,7 +62,6 @@ var (
 			if !ok {
 				panic("error when retrieving all the services for the provided config")
 			}
-			log.Infof("found service named: %s", ExpectedServiceAndExeName)
 
 			dialOptions := &ziti.DialOptions{
 				ConnectTimeout: 0,
@@ -79,7 +77,7 @@ var (
 			if err != nil {
 				panic(err)
 			}
-			zsshlib.RemoteShell(factory, zclient)
+			zsshlib.RemoteShell(zclient)
 		},
 
 	}

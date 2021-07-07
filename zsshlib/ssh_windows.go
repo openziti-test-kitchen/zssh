@@ -38,7 +38,7 @@ func sshAuthMethodAgent() ssh.AuthMethod {
 	} else {
 		warnOnce.Do(func() {
 			pipePresent = false
-			logrus.WithError(err).Warn("could not connect to openssh zssh-agent pipe, will not be tried again this run")
+			logrus.WithError(err).Debug("could not connect to openssh zssh-agent pipe, will not be tried again this run")
 		})
 	}
 	return nil

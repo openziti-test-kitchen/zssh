@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -29,31 +30,38 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-func RemoteShell(factory SshConfigFactory, client *ssh.Client) error {
+func RemoteShell(client *ssh.Client) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
 	}
 
-	fd := int(os.Stdout.Fd())
+	stdInFd := int(os.Stdin.Fd())
+	stdOutFd := int(os.Stdout.Fd())
 
-	oldState, err := terminal.MakeRaw(fd)
+	oldState, err := terminal.MakeRaw(stdInFd)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
 		_ = session.Close()
-		_ = terminal.Restore(fd, oldState)
+		_ = terminal.Restore(stdInFd, oldState)
 	}()
 
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 	session.Stdin = os.Stdin
 
-	termWidth, termHeight, err := terminal.GetSize(fd)
+	termWidth, termHeight, err := terminal.GetSize(stdOutFd)
 	if err != nil {
 		panic(err)
 	}
+	
+	fmt.Print( "\033[s") //save the cursor position
+	fmt.Print(strings.Repeat("-", termWidth - 1))
+	fmt.Print("\n")
+	fmt.Print( "\033[u") //restore the cursor position
+	fmt.Print("connected.")
 
 	if err := session.RequestPty("xterm", termHeight, termWidth, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
 		return err
