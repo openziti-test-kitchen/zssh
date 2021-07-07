@@ -8,18 +8,19 @@ on:
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-       - os: ubuntu-latest
-         artifact_name: zssh
-         asset_name: zssh-linux-amd64
-       - os: windows-latest
-         artifact_name: zssh.exe
-         asset_name: zssh-windows-amd64
-       - os: macos-latest
-         artifact_name: zssh
-         asset_name: zssh-macos-amd64
-    runs-on: ${{ matrix.os }}
+        include:
+         - os: ubuntu-latest
+           artifact_name: zssh
+           asset_name: zssh-linux-amd64
+         - os: windows-latest
+           artifact_name: zssh.exe
+           asset_name: zssh-windows-amd64
+         - os: macos-latest
+           artifact_name: zssh
+           asset_name: zssh-macos-amd64
     steps:
     - uses: actions/checkout@v2
 
@@ -31,7 +32,7 @@ jobs:
     - name: Build
       run: go build -v ./...
       
-   - name: Upload binaries to release
+    - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
