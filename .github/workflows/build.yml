@@ -1,7 +1,8 @@
 name: build
 
 on:
-  release
+  release:
+    types: [published]
 
 jobs:
   build:
