@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"zssh/zsshlib"
 )
@@ -17,8 +18,9 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	ZConfig string
+	ZConfig    string
 	SshKeyPath string
+	debug      bool
 
 	rootCmd = &cobra.Command{
 		Use: fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
@@ -33,6 +35,9 @@ var (
 				}
 				SshKeyPath = filepath.Join(userHome,".ssh","id_rsa")
 			}
+			if debug {
+				logrus.Infof("    sshKeyPath set to: %s", SshKeyPath)
+			}
 
 			if ZConfig == "" {
 				userHome, err := os.UserHomeDir()
@@ -40,6 +45,9 @@ var (
 					logrus.Fatal(err)
 				}
 				ZConfig = filepath.Join(userHome,".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
+			}
+			if debug {
+				logrus.Infof("       ZConfig set to: %s", ZConfig)
 			}
 
 			var username string
@@ -54,7 +62,14 @@ var (
 					logrus.Fatal(err)
 				}
 				username = curUser.Username
+				if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
+					username = strings.Split(username, "\\")[1]
+				}
 				targetIdentity = args[0]
+			}
+			if debug {
+				logrus.Infof("      username set to: %s", username)
+				logrus.Infof("targetIdentity set to: %s", targetIdentity)
 			}
 
 			ctx := ziti.NewContextWithConfig(getConfig(ZConfig))
@@ -80,13 +95,13 @@ var (
 			}
 			zsshlib.RemoteShell(zclient)
 		},
-
 	}
 )
 
 func init() {
 	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
+	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
 }
 
 type ServiceConfig struct {
