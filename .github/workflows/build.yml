@@ -43,6 +43,8 @@ jobs:
         file: ${{ runner.workspace }}/build/${{ matrix.artifact_name }}
         asset_name: ${{ matrix.asset_name }}
         tag: latest-tag
+        overwrite: true
+        release_name: latest-tagged-release
         
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
