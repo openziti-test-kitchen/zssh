@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/openziti/sdk-golang/ziti/config"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -28,7 +29,7 @@ var (
 			if SshKeyPath == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					panic(err)
+					logrus.Fatal(err)
 				}
 				SshKeyPath = filepath.Join(userHome,".ssh","id_rsa")
 			}
@@ -36,7 +37,7 @@ var (
 			if ZConfig == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					panic(err)
+					logrus.Fatal(err)
 				}
 				ZConfig = filepath.Join(userHome,".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
 			}
@@ -50,7 +51,7 @@ var (
 			} else {
 				curUser, err := user.Current()
 				if err != nil {
-					panic(err)
+					logrus.Fatal(err)
 				}
 				username = curUser.Username
 				targetIdentity = args[0]
@@ -60,7 +61,7 @@ var (
 
 			_, ok := ctx.GetService(ExpectedServiceAndExeName)
 			if !ok {
-				panic("error when retrieving all the services for the provided config")
+				logrus.Fatal("error when retrieving all the services for the provided config")
 			}
 
 			dialOptions := &ziti.DialOptions{
@@ -70,12 +71,12 @@ var (
 			}
 			svc, err := ctx.DialWithOptions(ExpectedServiceAndExeName, dialOptions)
 			if err != nil {
-				panic(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
+				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
 			}
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
 			zclient, err := zsshlib.Dial(factory.Config(), svc)
 			if err != nil {
-				panic(err)
+				logrus.Fatal(err)
 			}
 			zsshlib.RemoteShell(zclient)
 		},

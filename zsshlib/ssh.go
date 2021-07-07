@@ -41,7 +41,7 @@ func RemoteShell(client *ssh.Client) error {
 
 	oldState, err := terminal.MakeRaw(stdInFd)
 	if err != nil {
-		panic(err)
+		logrus.Fatal(err)
 	}
 	defer func() {
 		_ = session.Close()
@@ -54,9 +54,9 @@ func RemoteShell(client *ssh.Client) error {
 
 	termWidth, termHeight, err := terminal.GetSize(stdOutFd)
 	if err != nil {
-		panic(err)
+		logrus.Fatal(err)
 	}
-	
+
 	fmt.Print( "\033[s") //save the cursor position
 	fmt.Print(strings.Repeat("-", termWidth - 1))
 	fmt.Print("\n")
