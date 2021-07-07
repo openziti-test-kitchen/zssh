@@ -34,7 +34,7 @@ jobs:
       run: mkdir "${{ runner.workspace }}/build"
       
     - name: Build
-      run: go build -v ./... -o ${{ runner.workspace }}/build
+      run: go build -o ${{ runner.workspace }}/build ./... 
       
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
