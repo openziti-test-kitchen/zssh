@@ -33,12 +33,12 @@ func sshAuthMethodAgent() ssh.AuthMethod {
 		return nil
 	}
 
-	if sshAgent, err := npipe.DialTimeout(`\\.\pipe\openssh-zssh-agent`, 1*time.Second); err == nil {
+	if sshAgent, err := npipe.DialTimeout(`\\.\pipe\openssh-ssh-agent`, 1*time.Second); err == nil {
 		return ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
 	} else {
 		warnOnce.Do(func() {
 			pipePresent = false
-			logrus.WithError(err).Debug("could not connect to openssh zssh-agent pipe, will not be tried again this run")
+			logrus.WithError(err).Warn("could not connect to openssh-ssh-agent pipe, is the ssh-agent service (OpenSSH Authentication Agent) running?")
 		})
 	}
 	return nil
