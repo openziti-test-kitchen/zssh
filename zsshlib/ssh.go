@@ -17,56 +17,19 @@
 package zsshlib
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
-	"github.com/openziti/foundation/util/info"
-	"github.com/pkg/errors"
-	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-var SshCommand string
-
-func LaunchService(factory SshConfigFactory, name, cfg string) error {
-	serviceCmd := fmt.Sprintf("nohup /home/%s/fablab/bin/%s --log-formatter pfxlog run /home/%s/fablab/cfg/%s > logs/%s.log 2>&1 &", factory.User(), name, factory.User(), cfg, name)
-	if value, err := RemoteExec(factory, serviceCmd); err == nil {
-		if len(value) > 0 {
-			logrus.Infof("output [%s]", strings.Trim(value, " \t\r\n"))
-		}
-	} else {
-		return err
-	}
-	return nil
-}
-
-func KillService(factory SshConfigFactory, name string) error {
-	return RemoteKill(factory, fmt.Sprintf("/home/%s/fablab/bin/%s", factory.User(), name))
-}
-
 func RemoteShell(factory SshConfigFactory, client *ssh.Client) error {
-	/*
-	config := factory.Config()
-
-	logrus.Infof("shell for [%s]", factory.Address())
-
-	client, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return err
-	}
-	*/
-
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -104,7 +67,7 @@ func RemoteShell(factory SshConfigFactory, client *ssh.Client) error {
 	return nil
 }
 
-func Dial( config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
+func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	c, chans, reqs, err := ssh.NewClientConn(conn, "", config)
 	if err != nil {
 		return nil, err
@@ -112,263 +75,6 @@ func Dial( config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-func RemoteConsole(factory SshConfigFactory, cmd string) error {
-	config := factory.Config()
-	logrus.Infof("console for [%s]: '%s'", factory.Address(), cmd)
-
-	client, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return err
-	}
-
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = session.Close() }()
-
-	if err := session.RequestPty("xterm", 40, 80, ssh.TerminalModes{ssh.ECHO: 0}); err != nil {
-		return err
-	}
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-	session.Stdin = os.Stdin
-
-	err = session.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func RemoteExec(sshConfig SshConfigFactory, cmd string) (string, error) {
-	return RemoteExecAll(sshConfig, cmd)
-}
-
-func RemoteExecAll(sshConfig SshConfigFactory, cmds ...string) (string, error) {
-	var b bytes.Buffer
-	err := RemoteExecAllTo(sshConfig, &b, cmds...)
-	return b.String(), err
-}
-
-func RemoteExecAllTo(sshConfig SshConfigFactory, out io.Writer, cmds ...string) error {
-	if len(cmds) == 0 {
-		return nil
-	}
-	config := sshConfig.Config()
-
-	logrus.Infof("executing [%s]: '%s'", sshConfig.Address(), cmds[0])
-
-	client, err := ssh.Dial("tcp", sshConfig.Address(), config)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = client.Close() }()
-
-	for idx, cmd := range cmds {
-		session, err := client.NewSession()
-		if err != nil {
-			return err
-		}
-		session.Stdout = out
-
-		if idx > 0 {
-			logrus.Infof("executing [%s]: '%s'", sshConfig.Address(), cmd)
-		}
-		err = session.Run(cmd)
-		_ = session.Close()
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func RemoteKill(factory SshConfigFactory, match string) error {
-	return RemoteKillFilter(factory, match, "")
-}
-
-func RemoteKillFilter(factory SshConfigFactory, match string, anti string) error {
-	output, err := RemoteExec(factory, "ps ax")
-	if err != nil {
-		return errors.Wrapf(err, "unable to get remote process listing [%s]", factory.Address())
-	}
-
-	var pidList []int
-	r := strings.NewReader(output)
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if killMatch(line, match, anti) {
-			logrus.Infof("line [%s]", scanner.Text())
-			tokens := strings.Split(strings.Trim(line, " \t\n"), " ")
-			if pid, err := strconv.Atoi(tokens[0]); err == nil {
-				pidList = append(pidList, pid)
-			} else {
-				return fmt.Errorf("unexpected ps output")
-			}
-		}
-	}
-
-	if len(pidList) > 0 {
-		killCmd := "sudo kill"
-		for _, pid := range pidList {
-			killCmd += fmt.Sprintf(" %d", pid)
-		}
-
-		output, err = RemoteExec(factory, killCmd)
-		if err != nil {
-			return fmt.Errorf("unable to kill [%s] (%s)", factory.Address(), err)
-		}
-	}
-
-	return nil
-}
-
-func killMatch(s, search, anti string) bool {
-	match := false
-	if strings.Contains(s, search) {
-		match = true
-	}
-	if anti != "" && strings.Contains(s, anti) {
-		match = false
-	}
-	return match
-}
-
-func RemoteFileList(factory SshConfigFactory, path string) ([]os.FileInfo, error) {
-	config := factory.Config()
-
-	conn, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return nil, fmt.Errorf("error dialing zssh server (%w)", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := sftp.NewClient(conn)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sftp client (%w)", err)
-	}
-	defer func() { _ = client.Close() }()
-
-	files, err := client.ReadDir(path)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving directory [%s] (%w)", path, err)
-	}
-
-	return files, nil
-}
-
-func SendFile(factory SshConfigFactory, localPath string, remotePath string) error {
-	localFile, err := ioutil.ReadFile(localPath)
-
-	if err != nil {
-		return errors.Wrapf(err, "unable to read local file %v", localFile)
-	}
-
-	config := factory.Config()
-
-	conn, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return errors.Wrap(err, "error dialing zssh server")
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := sftp.NewClient(conn)
-	if err != nil {
-		return errors.Wrap(err, "error creating sftp client")
-	}
-	defer func() { _ = client.Close() }()
-
-	rmtFile, err := client.OpenFile(remotePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
-
-	if err != nil {
-		return errors.Wrapf(err, "unable to open remote file %v", remotePath)
-	}
-	defer rmtFile.Close()
-
-	_, err = rmtFile.Write(localFile)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func RetrieveRemoteFiles(factory SshConfigFactory, localPath string, paths ...string) error {
-	if len(paths) < 1 {
-		return nil
-	}
-
-	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
-		return fmt.Errorf("error creating local path")
-	}
-
-	config := factory.Config()
-
-	conn, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return fmt.Errorf("error dialing zssh server (%w)", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := sftp.NewClient(conn)
-	if err != nil {
-		return fmt.Errorf("error creating sftp client (%w)", err)
-	}
-	defer func() { _ = client.Close() }()
-
-	for _, path := range paths {
-		rf, err := client.Open(path)
-		if err != nil {
-			return fmt.Errorf("error opening remote file [%s] (%w)", path, err)
-		}
-		defer func() { _ = rf.Close() }()
-
-		lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(path)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("error opening local file [%s] (%w)", path, err)
-		}
-		defer func() { _ = lf.Close() }()
-
-		n, err := io.Copy(lf, rf)
-		if err != nil {
-			return fmt.Errorf("error copying remote file to local [%s] (%w)", path, err)
-		}
-		logrus.Infof("%s => %s", path, info.ByteCount(n))
-	}
-
-	return nil
-}
-
-func DeleteRemoteFiles(factory SshConfigFactory, paths ...string) error {
-	config := factory.Config()
-
-	conn, err := ssh.Dial("tcp", factory.Address(), config)
-	if err != nil {
-		return fmt.Errorf("error dialing zssh server (%w)", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := sftp.NewClient(conn)
-	if err != nil {
-		return fmt.Errorf("error creating sftp client (%w)", err)
-	}
-	defer func() { _ = client.Close() }()
-
-	for _, path := range paths {
-		if err := client.Remove(path); err != nil {
-			return fmt.Errorf("error removing path [%s] (%w)", path, err)
-		}
-		logrus.Infof("%s removed", path)
-	}
-
-	return nil
-}
 
 type SshConfigFactory interface {
 	Address() string
