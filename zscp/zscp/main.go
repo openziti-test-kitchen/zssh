@@ -1,10 +1,9 @@
 package main
 
 import (
-	"zssh/cmd"
+	"zssh/zscp"
 )
 
 func main() {
-	cmd.Execute()
+	zscp.Execute()
 }
-

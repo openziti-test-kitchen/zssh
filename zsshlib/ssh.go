@@ -18,9 +18,14 @@ package zsshlib
 
 import (
 	"fmt"
+	"github.com/openziti/foundation/util/info"
+	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -174,4 +179,82 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 			return nil, fmt.Errorf("error parsing private key from [%s]L %w", keyPath, err)
 		}
 	}
+}
+
+func SendFile(factory SshConfigFactory, localPath string, remotePath string, conn net.Conn) error {
+	config := factory.Config()
+	localFile, err := ioutil.ReadFile(localPath)
+
+	if err != nil {
+		return errors.Wrapf(err, "unable to read local file %v", localFile)
+	}
+
+	defer func() { _ = conn.Close() }()
+	sshConn, err := Dial(config, conn)
+	client, err := sftp.NewClient(sshConn)
+	if err != nil {
+		return errors.Wrap(err, "error creating sftp client")
+	}
+	defer func() { _ = client.Close() }()
+
+	rmtFile, err := client.OpenFile(remotePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+
+	if err != nil {
+		return errors.Wrapf(err, "unable to open remote file %v", remotePath)
+	}
+	defer rmtFile.Close()
+
+	_, err = rmtFile.Write(localFile)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath string, paths ...string) error {
+	if len(paths) < 1 {
+		return nil
+	}
+
+	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
+		return fmt.Errorf("error creating local path: %s", localPath)
+	}
+
+	config := factory.Config()
+
+	sshConn, err := Dial(config,conn)
+	if err != nil {
+		return fmt.Errorf("error dialing zssh server (%w)", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	client, err := sftp.NewClient(sshConn)
+	if err != nil {
+		return fmt.Errorf("error creating sftp client (%w)", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	for _, path := range paths {
+		rf, err := client.Open(path)
+		if err != nil {
+			return fmt.Errorf("error opening remote file [%s] (%w)", path, err)
+		}
+		defer func() { _ = rf.Close() }()
+
+		lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(path)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("error opening local file [%s] (%w)", path, err)
+		}
+		defer func() { _ = lf.Close() }()
+
+		n, err := io.Copy(lf, rf)
+		if err != nil {
+			return fmt.Errorf("error copying remote file to local [%s] (%w)", path, err)
+		}
+		logrus.Infof("%s => %s", path, info.ByteCount(n))
+	}
+
+	return nil
 }
