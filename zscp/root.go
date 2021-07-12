@@ -21,6 +21,7 @@ var (
 	ZConfig    string
 	SshKeyPath string
 	debug      bool
+	recursive  bool
 
 	rootCmd = &cobra.Command{
 		Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
@@ -124,6 +125,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
+	rootCmd.Flags().BoolVarP(&recursive,"recursive", "d",false, "pass to enable recursive file transfer")
 }
 
 type ServiceConfig struct {
