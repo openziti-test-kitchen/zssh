@@ -62,10 +62,10 @@ func RemoteShell(client *ssh.Client) error {
 		logrus.Fatal(err)
 	}
 
-	fmt.Print( "\033[s") //save the cursor position
-	fmt.Print(strings.Repeat("-", termWidth - 1))
+	fmt.Print("\033[s") //save the cursor position
+	fmt.Print(strings.Repeat("-", termWidth-1))
 	fmt.Print("\n")
-	fmt.Print( "\033[u") //restore the cursor position
+	fmt.Print("\033[u") //restore the cursor position
 	fmt.Print("connected.")
 
 	if err := session.RequestPty("xterm", termHeight, termWidth, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
@@ -87,7 +87,6 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	}
 	return ssh.NewClient(c, chans, reqs), nil
 }
-
 
 type SshConfigFactory interface {
 	Address() string
@@ -204,8 +203,8 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	return nil
 }
 
-func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath string, paths ...string) error {
-	if len(paths) < 1 {
+func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath string, remotePath ...string) error {
+	if len(remotePath) < 1 {
 		return nil
 	}
 
@@ -215,7 +214,7 @@ func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath stri
 
 	config := factory.Config()
 
-	sshConn, err := Dial(config,conn)
+	sshConn, err := Dial(config, conn)
 	if err != nil {
 		return fmt.Errorf("error dialing zssh server (%w)", err)
 	}
@@ -227,7 +226,7 @@ func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath stri
 	}
 	defer func() { _ = client.Close() }()
 
-	for _, path := range paths {
+	for _, path := range remotePath {
 		rf, err := client.Open(path)
 		if err != nil {
 			return fmt.Errorf("error opening remote file [%s] (%w)", path, err)

@@ -73,6 +73,18 @@ var (
 				logrus.Fatal("cannot determine remote file PATH use \":\" for remote path")
 			}
 
+			localFilePath, err := filepath.Abs(localFilePath)
+			if err != nil {
+				logrus.Fatalf("cannot determine absolute local file path, unrecognized file name: %s", localFilePath)
+			}
+			if _, err := os.Stat(localFilePath); err != nil {
+				logrus.Fatal(err)
+			}
+
+			if debug {
+				logrus.Infof("           local path: %s", localFilePath)
+			}
+
 			fullRemoteFilePath := strings.Split(remoteFilePath, ":")
 			remoteFilePath = fullRemoteFilePath[1]
 
@@ -134,16 +146,16 @@ var (
 						if info.IsDir() {
 							err = client.Mkdir(remotePath)
 							remoteDirPath = filepath.Join(remoteDirPath, info.Name()) //gets file name from fs.DirEntry { info.name()}
-							if err != nil {
-								logrus.Error(err)
+							if err != nil && debug {
+								logrus.Error(err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
 							} else if debug {
 								logrus.Infof("made directory: %s", path)
 							}
 						} else {
 							err = zsshlib.SendFile(client, path, remotePath)
 							if err != nil {
-								return err
-							} else if debug {
+								return fmt.Errorf("could not send file: %s [%v]", path, err)
+							} else {
 								logrus.Infof("sent file: %s ==> %s", path, remotePath)
 							}
 						}
