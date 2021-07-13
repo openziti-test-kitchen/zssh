@@ -9,9 +9,6 @@ import (
 func init() {
 	logrus.SetFormatter(&logrusFormatter{})
 }
-type Billly struct {
-
-}
 type logrusFormatter struct {
 }
 
