@@ -1,4 +1,4 @@
-package zssh
+package main
 
 import (
 	"fmt"
@@ -23,17 +23,18 @@ var (
 	debug      bool
 
 	rootCmd = &cobra.Command{
-		Use: fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
-		Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
-		Long: "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-		Args: cobra.ExactValidArgs(1),
+		Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
+			"Local to Remote: zscp [Local Path] <remoteUsername>@<targetIdentity>:[Remote Path]",
+		Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
+		Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+		Args:  cobra.ExactValidArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			if SshKeyPath == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				SshKeyPath = filepath.Join(userHome,".ssh","id_rsa")
+				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
 			}
 			if debug {
 				logrus.Infof("    sshKeyPath set to: %s", SshKeyPath)
@@ -44,7 +45,7 @@ var (
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				ZConfig = filepath.Join(userHome,".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
+				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
 			}
 			if debug {
 				logrus.Infof("       ZConfig set to: %s", ZConfig)
@@ -52,8 +53,28 @@ var (
 
 			var username string
 			var targetIdentity string
-			if strings.ContainsAny(args[0], "@") {
-				userServiceName := strings.Split(args[0], "@")
+			var remoteFilePath string
+			var localFilePath string
+			var isCopyToRemote bool
+
+			if strings.ContainsAny(args[0], ":") {
+				remoteFilePath = args[0]
+				localFilePath = args[1]
+				isCopyToRemote = false
+
+			} else if strings.ContainsAny(args[1], ":") {
+				remoteFilePath = args[1]
+				localFilePath = args[0]
+				isCopyToRemote = true
+			} else {
+				logrus.Fatal("cannot determine remote file PATH")
+			}
+
+			fullRemoteFilePath := strings.Split(remoteFilePath, ":")
+			remoteFilePath = fullRemoteFilePath[1]
+
+			if strings.ContainsAny(fullRemoteFilePath[0], "@") {
+				userServiceName := strings.Split(fullRemoteFilePath[0], "@")
 				username = userServiceName[0]
 				targetIdentity = userServiceName[1]
 			} else {
@@ -89,11 +110,12 @@ var (
 				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
 			}
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
-			zclient, err := zsshlib.Dial(factory.Config(), svc)
-			if err != nil {
-				logrus.Fatal(err)
+
+			if isCopyToRemote {
+				zsshlib.SendFile(factory, localFilePath, remoteFilePath, svc)
+			} else {
+				zsshlib.RetrieveRemoteFiles(factory, svc, localFilePath, remoteFilePath)
 			}
-			zsshlib.RemoteShell(zclient)
 		},
 	}
 )
@@ -102,6 +124,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
+
 }
 
 type ServiceConfig struct {
@@ -110,7 +133,7 @@ type ServiceConfig struct {
 	Port     int
 }
 
-func Execute() error{
+func Execute() error {
 	return rootCmd.Execute()
 }
 
@@ -121,6 +144,3 @@ func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	}
 	return zitiCfg
 }
-
-
-

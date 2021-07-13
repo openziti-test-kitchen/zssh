@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/mattn/go-isatty v0.0.13 // indirect
+	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/natefinch/npipe v0.0.0-20160621034901-c1b8fa8bdcce
 	github.com/openziti/foundation v0.15.53
 	github.com/openziti/sdk-golang v0.15.47
