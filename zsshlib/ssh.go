@@ -27,7 +27,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -62,11 +61,7 @@ func RemoteShell(client *ssh.Client) error {
 		logrus.Fatal(err)
 	}
 
-	fmt.Print( "\033[s") //save the cursor position
-	fmt.Print(strings.Repeat("-", termWidth - 1))
-	fmt.Print("\n")
-	fmt.Print( "\033[u") //restore the cursor position
-	fmt.Print("connected.")
+	fmt.Println("connected.")
 
 	if err := session.RequestPty("xterm", termHeight, termWidth, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
 		return err
