@@ -191,6 +191,9 @@ func SendFile(factory SshConfigFactory, localPath string, remotePath string, con
 
 	defer func() { _ = conn.Close() }()
 	sshConn, err := Dial(config, conn)
+	if err != nil{
+		return errors.Wrapf(err, "error dialing SSH Conn")
+	}
 	client, err := sftp.NewClient(sshConn)
 	if err != nil {
 		return errors.Wrap(err, "error creating sftp client")
@@ -205,10 +208,11 @@ func SendFile(factory SshConfigFactory, localPath string, remotePath string, con
 	defer rmtFile.Close()
 
 	_, err = rmtFile.Write(localFile)
-
 	if err != nil {
 		return err
 	}
+
+
 
 	return nil
 }

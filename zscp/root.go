@@ -6,6 +6,7 @@ import (
 	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"io/fs"
 	"log"
 	"os"
 	"os/user"
@@ -21,6 +22,7 @@ var (
 	ZConfig    string
 	SshKeyPath string
 	debug      bool
+	recursive  bool
 
 	rootCmd = &cobra.Command{
 		Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
@@ -67,7 +69,7 @@ var (
 				localFilePath = args[0]
 				isCopyToRemote = true
 			} else {
-				logrus.Fatal("cannot determine remote file PATH")
+				logrus.Fatal("cannot determine remote file PATH use \":\" for remote path")
 			}
 
 			fullRemoteFilePath := strings.Split(remoteFilePath, ":")
@@ -77,6 +79,7 @@ var (
 				userServiceName := strings.Split(fullRemoteFilePath[0], "@")
 				username = userServiceName[0]
 				targetIdentity = userServiceName[1]
+
 			} else {
 				curUser, err := user.Current()
 				if err != nil {
@@ -112,7 +115,22 @@ var (
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
 
 			if isCopyToRemote {
-				zsshlib.SendFile(factory, localFilePath, remoteFilePath, svc)
+				if recursive {
+					err := filepath.Walk(localFilePath, func(path string, info fs.FileInfo, err error) error {
+						err = zsshlib.SendFile(factory, path, filepath.Join(remoteFilePath,filepath.Base(path)), svc)
+						if err != nil {
+							logrus.Info(err)
+						} else {
+							logrus.Debug(fmt.Sprintf("send file: %s", path))
+						}
+						return nil
+					})
+					if err != nil {
+						logrus.Fatal(err)
+					}
+				} else {
+					zsshlib.SendFile(factory, localFilePath, remoteFilePath, svc)
+				}
 			} else {
 				zsshlib.RetrieveRemoteFiles(factory, svc, localFilePath, remoteFilePath)
 			}
@@ -124,7 +142,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
-
+	rootCmd.Flags().BoolVarP(&recursive,"recursive", "r",false, "pass to enable recursive file transfer")
 }
 
 type ServiceConfig struct {
