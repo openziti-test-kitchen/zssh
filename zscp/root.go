@@ -117,7 +117,7 @@ var (
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
 			config := factory.Config()
 			sshConn, err := zsshlib.Dial(config, svc)
-			if err != nil{
+			if err != nil {
 				logrus.Fatal(err, "error dialing SSH Conn")
 			}
 			client, err := sftp.NewClient(sshConn)
@@ -128,21 +128,23 @@ var (
 
 			if isCopyToRemote {
 				if recursive {
+					remoteDirPath := remoteFilePath
 					err := filepath.WalkDir(localFilePath, func(path string, info fs.DirEntry, err error) error {
-						remoteDestination := filepath.Join(remoteFilePath,filepath.Base(path))
+						remotePath := filepath.Join(remoteDirPath, filepath.Base(path))
 						if info.IsDir() {
-							err = client.Mkdir(remoteDestination)
+							err = client.Mkdir(remotePath)
+							remoteDirPath = filepath.Join(remoteDirPath, info.Name()) //gets file name from fs.DirEntry { info.name()}
 							if err != nil {
 								logrus.Error(err)
 							} else if debug {
-								logrus.Infof("made directory: %s", remoteDestination)
+								logrus.Infof("made directory: %s", path)
 							}
 						} else {
-							err = zsshlib.SendFile(client, path, remoteDestination)
+							err = zsshlib.SendFile(client, path, remotePath)
 							if err != nil {
 								return err
-							} else if debug{
-								logrus.Infof("sent file: %s ==> %s", path, remoteDestination)
+							} else if debug {
+								logrus.Infof("sent file: %s ==> %s", path, remotePath)
 							}
 						}
 						return nil
@@ -164,7 +166,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
-	rootCmd.Flags().BoolVarP(&recursive,"recursive", "r",false, "pass to enable recursive file transfer")
+	rootCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 
 type ServiceConfig struct {
