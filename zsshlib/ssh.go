@@ -181,24 +181,13 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 	}
 }
 
-func SendFile(factory SshConfigFactory, localPath string, remotePath string, conn net.Conn) error {
-	config := factory.Config()
+func SendFile(client *sftp.Client, localPath string, remotePath string) error {
+
 	localFile, err := ioutil.ReadFile(localPath)
 
 	if err != nil {
 		return errors.Wrapf(err, "unable to read local file %v", localFile)
 	}
-
-	defer func() { _ = conn.Close() }()
-	sshConn, err := Dial(config, conn)
-	if err != nil{
-		return errors.Wrapf(err, "error dialing SSH Conn")
-	}
-	client, err := sftp.NewClient(sshConn)
-	if err != nil {
-		return errors.Wrap(err, "error creating sftp client")
-	}
-	defer func() { _ = client.Close() }()
 
 	rmtFile, err := client.OpenFile(remotePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 
@@ -211,8 +200,6 @@ func SendFile(factory SshConfigFactory, localPath string, remotePath string, con
 	if err != nil {
 		return err
 	}
-
-
 
 	return nil
 }
@@ -261,4 +248,8 @@ func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath stri
 	}
 
 	return nil
+}
+
+func startClient() {
+
 }

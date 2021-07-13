@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/openziti/sdk-golang/ziti/config"
+	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"io/fs"
@@ -109,19 +110,40 @@ var (
 				AppData:        nil,
 			}
 			svc, err := ctx.DialWithOptions(ExpectedServiceAndExeName, dialOptions)
+			defer func() { _ = svc.Close() }()
 			if err != nil {
 				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
 			}
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
+			config := factory.Config()
+			sshConn, err := zsshlib.Dial(config, svc)
+			if err != nil{
+				logrus.Fatal(err, "error dialing SSH Conn")
+			}
+			client, err := sftp.NewClient(sshConn)
+			if err != nil {
+				logrus.Fatal(err, "error creating sftp client")
+			}
+			defer func() { _ = client.Close() }()
 
 			if isCopyToRemote {
 				if recursive {
-					err := filepath.Walk(localFilePath, func(path string, info fs.FileInfo, err error) error {
-						err = zsshlib.SendFile(factory, path, filepath.Join(remoteFilePath,filepath.Base(path)), svc)
-						if err != nil {
-							logrus.Info(err)
+					err := filepath.WalkDir(localFilePath, func(path string, info fs.DirEntry, err error) error {
+						remoteDestination := filepath.Join(remoteFilePath,filepath.Base(path))
+						if info.IsDir() {
+							err = client.Mkdir(remoteDestination)
+							if err != nil {
+								logrus.Error(err)
+							} else if debug {
+								logrus.Infof("made directory: %s", remoteDestination)
+							}
 						} else {
-							logrus.Debug(fmt.Sprintf("send file: %s", path))
+							err = zsshlib.SendFile(client, path, remoteDestination)
+							if err != nil {
+								return err
+							} else if debug{
+								logrus.Infof("sent file: %s ==> %s", path, remoteDestination)
+							}
 						}
 						return nil
 					})
@@ -129,7 +151,7 @@ var (
 						logrus.Fatal(err)
 					}
 				} else {
-					zsshlib.SendFile(factory, localFilePath, remoteFilePath, svc)
+					zsshlib.SendFile(client, localFilePath, remoteFilePath)
 				}
 			} else {
 				zsshlib.RetrieveRemoteFiles(factory, svc, localFilePath, remoteFilePath)
