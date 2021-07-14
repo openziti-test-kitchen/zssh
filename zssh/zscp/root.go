@@ -1,4 +1,4 @@
-package zscp
+package main
 
 import (
 	"fmt"
