@@ -165,10 +165,40 @@ var (
 						logrus.Fatal(err)
 					}
 				} else {
-					zsshlib.SendFile(client, localFilePath, remoteFilePath)
+					err = zsshlib.SendFile(client, localFilePath, remoteFilePath)
+					if err != nil {
+						logrus.Errorf("could not send file: %s [%v]", localFilePath, err)
+					} else {
+						logrus.Infof("sent file: %s ==> %s", localFilePath, remoteFilePath)
+					}
 				}
 			} else {
-				zsshlib.RetrieveRemoteFiles(factory, svc, localFilePath, remoteFilePath)
+				if recursive {
+					localDirPath := localFilePath
+					walker := client.Walk(remoteFilePath)
+					for walker.Step() {
+						localPath := filepath.Join(localDirPath, filepath.Base(walker.Path()))
+						if walker.Stat().IsDir() {
+							err = os.Mkdir(localPath, os.ModePerm)
+							if debug && err != nil {
+								logrus.Errorf("failed to make directory: %s [%v]", localDirPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+							} else if debug {
+								logrus.Infof("made directory: %s", localPath)
+							}
+							localDirPath = filepath.Join(localDirPath, filepath.Base(walker.Path()))
+						} else {
+							err = zsshlib.RetrieveRemoteFiles(client, localDirPath, walker.Path())
+							if err != nil {
+								logrus.Fatalf("failed to retrieve file: %s [%v]", walker.Path(), err)
+							}
+						}
+					}
+				} else {
+					err = zsshlib.RetrieveRemoteFiles(client, localFilePath, remoteFilePath)
+					if err != nil {
+						logrus.Fatalf("failed to retrieve file: %s [%v]", remoteFilePath, err)
+					}
+				}
 			}
 		},
 	}

@@ -23,17 +23,17 @@ var (
 	debug      bool
 
 	rootCmd = &cobra.Command{
-		Use: fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
+		Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
 		Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
-		Long: "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-		Args: cobra.ExactValidArgs(1),
+		Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+		Args:  cobra.ExactValidArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			if SshKeyPath == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				SshKeyPath = filepath.Join(userHome,".ssh","id_rsa")
+				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
 			}
 			if debug {
 				logrus.Infof("    sshKeyPath set to: %s", SshKeyPath)
@@ -44,7 +44,7 @@ var (
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				ZConfig = filepath.Join(userHome,".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
+				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
 			}
 			if debug {
 				logrus.Infof("       ZConfig set to: %s", ZConfig)
@@ -93,7 +93,10 @@ var (
 			if err != nil {
 				logrus.Fatal(err)
 			}
-			zsshlib.RemoteShell(zclient)
+			err = zsshlib.RemoteShell(zclient)
+			if err != nil {
+				log.Fatal("failed to open remote shell")
+			}
 		},
 	}
 )
@@ -110,7 +113,7 @@ type ServiceConfig struct {
 	Port     int
 }
 
-func Execute() error{
+func Execute() error {
 	return rootCmd.Execute()
 }
 
@@ -121,6 +124,3 @@ func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	}
 	return zitiCfg
 }
-
-
-

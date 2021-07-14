@@ -18,7 +18,6 @@ package zsshlib
 
 import (
 	"fmt"
-	"github.com/openziti/foundation/util/info"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"io"
@@ -203,28 +202,10 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	return nil
 }
 
-func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath string, remotePath ...string) error {
+func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath ...string) error {
 	if len(remotePath) < 1 {
 		return nil
 	}
-
-	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
-		return fmt.Errorf("error creating local path: %s", localPath)
-	}
-
-	config := factory.Config()
-
-	sshConn, err := Dial(config, conn)
-	if err != nil {
-		return fmt.Errorf("error dialing zssh server (%w)", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := sftp.NewClient(sshConn)
-	if err != nil {
-		return fmt.Errorf("error creating sftp client (%w)", err)
-	}
-	defer func() { _ = client.Close() }()
 
 	for _, path := range remotePath {
 		rf, err := client.Open(path)
@@ -239,16 +220,16 @@ func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath stri
 		}
 		defer func() { _ = lf.Close() }()
 
-		n, err := io.Copy(lf, rf)
+		_, err = io.Copy(lf, rf)
 		if err != nil {
 			return fmt.Errorf("error copying remote file to local [%s] (%w)", path, err)
 		}
-		logrus.Infof("%s => %s", path, info.ByteCount(n))
+		logrus.Infof("%s => %s", path, filepath.Join(localPath, path))
 	}
 
 	return nil
 }
 
-func startClient() {
+func makeClient() {
 
 }
