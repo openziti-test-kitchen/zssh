@@ -95,7 +95,7 @@ var (
 			}
 			err = zsshlib.RemoteShell(zclient)
 			if err != nil {
-				log.Fatal("failed to open remote shell")
+				logrus.Fatal("failed to open remote shell")
 			}
 		},
 	}

@@ -82,7 +82,6 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-
 type SshConfigFactory interface {
 	Address() string
 	Hostname() string
@@ -198,30 +197,25 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	return nil
 }
 
-func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath ...string) error {
-	if len(remotePath) < 1 {
-		return nil
+func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath string) error {
+
+	rf, err := client.Open(remotePath)
+	if err != nil {
+		return fmt.Errorf("error opening remote file [%s] (%w)", remotePath, err)
 	}
+	defer func() { _ = rf.Close() }()
 
-	for _, path := range remotePath {
-		rf, err := client.Open(path)
-		if err != nil {
-			return fmt.Errorf("error opening remote file [%s] (%w)", path, err)
-		}
-		defer func() { _ = rf.Close() }()
-
-		lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(path)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("error opening local file [%s] (%w)", path, err)
-		}
-		defer func() { _ = lf.Close() }()
-
-		_, err = io.Copy(lf, rf)
-		if err != nil {
-			return fmt.Errorf("error copying remote file to local [%s] (%w)", path, err)
-		}
-		logrus.Infof("%s => %s", path, filepath.Join(localPath, path))
+	lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(remotePath)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
 	}
+	defer func() { _ = lf.Close() }()
+
+	_, err = io.Copy(lf, rf)
+	if err != nil {
+		return fmt.Errorf("error copying remote file to local [%s] (%w)", remotePath, err)
+	}
+	logrus.Infof("%s => %s", remotePath, filepath.Join(localPath, remotePath))
 
 	return nil
 }
