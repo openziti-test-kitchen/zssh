@@ -8,102 +8,80 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"zssh/zsshlib"
 )
 
 const ExpectedServiceAndExeName = "zssh"
 
-var (
-	ZConfig     string
-	SshKeyPath  string
-	debug       bool
-	serviceName string
+var flags = &zsshlib.SshFlags{}
 
-	rootCmd = &cobra.Command{
-		Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", serviceName),
-		Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
-		Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-		Args:  cobra.ExactValidArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			if SshKeyPath == "" {
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					logrus.Fatalf("could not find UserHomeDir? %v", err)
-				}
-				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
-			}
-			if debug {
-				logrus.Infof("    sshKeyPath set to: %s", SshKeyPath)
-			}
-
-			if ZConfig == "" {
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					logrus.Fatalf("could not find UserHomeDir? %v", err)
-				}
-				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
-			}
-			if debug {
-				logrus.Infof("       ZConfig set to: %s", ZConfig)
-			}
-
-			var username string
-			var targetIdentity string
-			if strings.ContainsAny(args[0], "@") {
-				userServiceName := strings.Split(args[0], "@")
-				username = userServiceName[0]
-				targetIdentity = userServiceName[1]
-			} else {
-				curUser, err := user.Current()
-				if err != nil {
-					logrus.Fatal(err)
-				}
-				username = curUser.Username
-				if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
-					username = strings.Split(username, "\\")[1]
-				}
-				targetIdentity = args[0]
-			}
-			if debug {
-				logrus.Infof("      username set to: %s", username)
-				logrus.Infof("targetIdentity set to: %s", targetIdentity)
-			}
-
-			ctx := ziti.NewContextWithConfig(getConfig(ZConfig))
-
-			_, ok := ctx.GetService(serviceName)
-			if !ok {
-				logrus.Fatalf("could not find service: %s", serviceName)
-			}
-
-			dialOptions := &ziti.DialOptions{
-				ConnectTimeout: 0,
-				Identity:       targetIdentity,
-				AppData:        nil,
-			}
-			svc, err := ctx.DialWithOptions(serviceName, dialOptions)
+var rootCmd = &cobra.Command{
+	Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", flags.ServiceName),
+	Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
+	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+	Args:  cobra.ExactValidArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if flags.SshKeyPath == "" {
+			userHome, err := os.UserHomeDir()
 			if err != nil {
-				logrus.Fatalf("error when dialing service name %s. %v", serviceName, err)
+				logrus.Fatalf("could not find UserHomeDir? %v", err)
 			}
-			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
-			zclient, err := zsshlib.Dial(factory.Config(), svc)
+			flags.SshKeyPath = filepath.Join(userHome, zsshlib.SSH_DIR, zsshlib.ID_RSA)
+		}
+		if flags.Debug {
+			logrus.Infof("    flags.SshKeyPath set to: %s", flags.SshKeyPath)
+		}
+
+		if flags.ZConfig == "" {
+			userHome, err := os.UserHomeDir()
 			if err != nil {
-				logrus.Fatal(err)
+				logrus.Fatalf("could not find UserHomeDir? %v", err)
 			}
-			err = zsshlib.RemoteShell(zclient)
-		},
-	}
-)
+			flags.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
+		}
+		if flags.Debug {
+			logrus.Infof("       ZConfig set to: %s", flags.ZConfig)
+		}
+
+		username := zsshlib.ParseUserName(args[0])
+		targetIdentity := zsshlib.ParseTargetIdentity(args[1])
+
+		if flags.Debug {
+			logrus.Infof("      username set to: %s", username)
+			logrus.Infof("targetIdentity set to: %s", targetIdentity)
+		}
+
+		ctx := ziti.NewContextWithConfig(getConfig(flags.ZConfig))
+
+		_, ok := ctx.GetService(flags.ServiceName)
+		if !ok {
+			logrus.Fatalf("could not find service: %s", flags.ServiceName)
+		}
+
+		dialOptions := &ziti.DialOptions{
+			ConnectTimeout: 0,
+			Identity:       targetIdentity,
+			AppData:        nil,
+		}
+		svc, err := ctx.DialWithOptions(flags.ServiceName, dialOptions)
+		if err != nil {
+			logrus.Fatalf("error when dialing service name %s. %v", flags.ServiceName, err)
+		}
+		factory := zsshlib.NewSshConfigFactoryImpl(username, flags.SshKeyPath)
+		zclient, err := zsshlib.Dial(factory.Config(), svc)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		err = zsshlib.RemoteShell(zclient)
+	},
+}
 
 func init() {
-	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
-	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", serviceName))
-	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
+	rootCmd.Flags().StringVarP(&flags.ServiceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
+	rootCmd.Flags().StringVarP(&flags.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", flags.ServiceName))
+	rootCmd.Flags().StringVarP(&flags.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
+	rootCmd.Flags().BoolVarP(&flags.Debug, "debug", "d", false, "pass to enable additional debug information")
 }
 
 func getConfig(cfgFile string) (zitiCfg *config.Config) {

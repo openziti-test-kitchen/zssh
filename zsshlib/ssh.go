@@ -24,13 +24,34 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
+
+const (
+	ID_RSA = "id_rsa"
+	SSH_DIR = ".ssh"
+)
+
+type SshFlags struct {
+	ZConfig     string
+	SshKeyPath  string
+	Debug       bool
+	ServiceName string
+}
+
+type ScpFlags struct {
+	SshFlags
+	Recursive   bool
+	ServiceName string
+}
 
 func RemoteShell(client *ssh.Client) error {
 	session, err := client.NewSession()
@@ -217,4 +238,43 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	logrus.Infof("%s => %s", remotePath, localPath)
 
 	return nil
+}
+
+func ParseUserName(input string) string {
+	var username string
+	if strings.ContainsAny(input, "@") {
+		userServiceName := strings.Split(input, "@")
+		username = userServiceName[0]
+	} else {
+		curUser, err := user.Current()
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		username = curUser.Username
+		if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
+			username = strings.Split(username, "\\")[1]
+		}
+	}
+	return username
+}
+
+func ParseTargetIdentity(input string) string {
+	var targetIdentity string
+	if strings.ContainsAny(input, "@") {
+		targetIdentity = strings.Split(input, "@")[1]
+	} else {
+		targetIdentity = input
+	}
+
+	if strings.Contains(targetIdentity, ":") {
+		return strings.Split(targetIdentity, ":")[0]
+	}
+	return targetIdentity
+}
+
+func ParseFilePath(input string) string {
+	if strings.Contains(input, ":") {
+		return strings.Split(input, ":")[1]
+	}
+	return input
 }
