@@ -311,7 +311,7 @@ func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
 
 func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 	if f.Debug {
-		logrus.Infof(msg, args)
+		logrus.Infof(msg, args...)
 	}
 }
 
