@@ -25,27 +25,6 @@ var rootCmd = &cobra.Command{
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.ExactValidArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		if flags.SshKeyPath == "" {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir? %v", err)
-			}
-			flags.SshKeyPath = filepath.Join(userHome, zsshlib.SSH_DIR, zsshlib.ID_RSA)
-		}
-		if flags.Debug {
-			logrus.Infof("    sshKeyPath set to: %s", flags.SshKeyPath)
-		}
-
-		if flags.ZConfig == "" {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir: %v", err)
-			}
-			flags.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
-		}
-		if flags.Debug {
-			logrus.Infof("       ZConfig set to: %s", flags.ZConfig)
-		}
 
 		var username string
 		var remoteFilePath string
@@ -73,24 +52,20 @@ var rootCmd = &cobra.Command{
 			logrus.Fatal(err)
 		}
 
-		if flags.Debug {
-			logrus.Infof("           local path: %s", localFilePath)
-		}
+		flags.DebugLog("           local path: %s", localFilePath)
 
 		username = zsshlib.ParseUserName(remoteFilePath)
 		targetIdentity := zsshlib.ParseTargetIdentity(remoteFilePath)
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		if flags.Debug {
-			logrus.Infof("      username set to: %s", username)
-			logrus.Infof("targetIdentity set to: %s", targetIdentity)
-		}
+		flags.DebugLog("      username set to: %s", username)
+		flags.DebugLog("targetIdentity set to: %s", targetIdentity)
 
 		ctx := ziti.NewContextWithConfig(getConfig(flags.ZConfig))
 
 		_, ok := ctx.GetService(flags.ServiceName)
 		if !ok {
-			logrus.Fatalf("error when dialing service name %s. %v", flags.ServiceName, err)
+			logrus.Fatalf("service not found: %s", flags.ServiceName)
 		}
 
 		dialOptions := &ziti.DialOptions{
@@ -101,7 +76,7 @@ var rootCmd = &cobra.Command{
 		svc, err := ctx.DialWithOptions(flags.ServiceName, dialOptions)
 		defer func() { _ = svc.Close() }()
 		if err != nil {
-			logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", flags.ServiceName, err))
+			logrus.Fatalf("error when dialing service name %s. %v", flags.ServiceName, err)
 		}
 		factory := zsshlib.NewSshConfigFactoryImpl(username, flags.SshKeyPath)
 		config := factory.Config()
@@ -122,10 +97,10 @@ var rootCmd = &cobra.Command{
 					remotePath := filepath.Join(remoteFilePath, baseDir, after(path, baseDir))
 					if info.IsDir() {
 						err = client.Mkdir(remotePath)
-						if err != nil && flags.Debug {
-							logrus.Error(err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
-						} else if flags.Debug {
-							logrus.Infof("made directory: %s", remotePath)
+						if err != nil {
+							flags.DebugLog("%s", err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+						} else {
+							flags.DebugLog("made directory: %s", remotePath)
 						}
 					} else {
 						err = zsshlib.SendFile(client, path, remotePath)
@@ -156,10 +131,10 @@ var rootCmd = &cobra.Command{
 					localPath := filepath.Join(localFilePath, baseDir, after(walker.Path(), baseDir))
 					if walker.Stat().IsDir() {
 						err = os.Mkdir(localPath, os.ModePerm)
-						if flags.Debug && err != nil {
-							logrus.Errorf("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
-						} else if flags.Debug {
-							logrus.Infof("made directory: %s", localPath)
+						if err != nil {
+							flags.DebugLog("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+						} else {
+							flags.DebugLog("made directory: %s", localPath)
 						}
 					} else {
 						err = zsshlib.RetrieveRemoteFiles(client, localPath, walker.Path())
@@ -179,11 +154,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&flags.ZConfig, "ZConfig", "c", "", fmt.Sprintf("path to ziti config file. default: $HOME/.ziti/%s.json", flags.ServiceName))
-	rootCmd.Flags().StringVarP(&flags.SshKeyPath, "SshKeyPath", "i", "", "path to ssh key. default: $HOME/.ssh/id_rsa")
-	rootCmd.Flags().BoolVarP(&flags.Debug, "debug", "d", false, "pass to enable additional debug information")
+	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
-	rootCmd.Flags().StringVarP(&flags.ServiceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
 }
 
 func getConfig(cfgFile string) (zitiCfg *config.Config) {

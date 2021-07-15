@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
+	"github.com/spf13/cobra"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -50,7 +52,6 @@ type SshFlags struct {
 type ScpFlags struct {
 	SshFlags
 	Recursive   bool
-	ServiceName string
 }
 
 func RemoteShell(client *ssh.Client) error {
@@ -278,4 +279,45 @@ func ParseFilePath(input string) string {
 		return input[colPos:]
 	}
 	return input
+}
+
+func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
+	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", exeName, fmt.Sprintf("service name. default: %s", exeName))
+	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", f.ServiceName))
+	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
+	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable additional debug information")
+
+	if f.SshKeyPath == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			logrus.Fatalf("could not find UserHomeDir? %v", err)
+		}
+		f.SshKeyPath = filepath.Join(userHome, SSH_DIR, ID_RSA)
+	}
+	f.DebugLog("    flags.SshKeyPath set to: %s", f.SshKeyPath)
+
+	if f.ZConfig == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			logrus.Fatalf("could not find UserHomeDir? %v", err)
+		}
+		f.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", exeName))
+	}
+	f.DebugLog("       ZConfig set to: %s", f.ZConfig)
+}
+
+func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
+	if f.Debug {
+		logrus.Infof(msg, args)
+	}
+}
+/*
+func (f *ScpFlags) DebugLog(msg string, args ...interface{}) {
+	if f.Debug {
+		logrus.Infof(msg, args)
+	}
+}*/
+
+func EstablishClient() {
+
 }

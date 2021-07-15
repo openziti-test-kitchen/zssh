@@ -56,6 +56,6 @@ func TestParseFilePath(t *testing.T) {
 	result = ParseFilePath("user@hostname:")
 	assert.Equal(t, result, "", "user not correct")
 
-	result = ParseFilePath("user@hostname:/haha://two:colons")
-	assert.Equal(t, result, "/haha://two:colons", "user not correct")
+	result = ParseFilePath(`user@hostname:/haha://two\:colons`)
+	assert.Equal(t, result, `/haha://two\:colons`, "user not correct")
 }

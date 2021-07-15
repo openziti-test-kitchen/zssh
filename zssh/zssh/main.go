@@ -7,8 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"log"
-	"os"
-	"path/filepath"
 	"zssh/zsshlib"
 )
 
@@ -22,35 +20,11 @@ var rootCmd = &cobra.Command{
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if flags.SshKeyPath == "" {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir? %v", err)
-			}
-			flags.SshKeyPath = filepath.Join(userHome, zsshlib.SSH_DIR, zsshlib.ID_RSA)
-		}
-		if flags.Debug {
-			logrus.Infof("    flags.SshKeyPath set to: %s", flags.SshKeyPath)
-		}
-
-		if flags.ZConfig == "" {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir? %v", err)
-			}
-			flags.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
-		}
-		if flags.Debug {
-			logrus.Infof("       ZConfig set to: %s", flags.ZConfig)
-		}
-
 		username := zsshlib.ParseUserName(args[0])
-		targetIdentity := zsshlib.ParseTargetIdentity(args[1])
+		targetIdentity := zsshlib.ParseTargetIdentity(args[0])
 
-		if flags.Debug {
-			logrus.Infof("      username set to: %s", username)
-			logrus.Infof("targetIdentity set to: %s", targetIdentity)
-		}
+		flags.DebugLog("      username set to: %s", username)
+		flags.DebugLog("targetIdentity set to: %s", targetIdentity)
 
 		ctx := ziti.NewContextWithConfig(getConfig(flags.ZConfig))
 
@@ -78,10 +52,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&flags.ServiceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
-	rootCmd.Flags().StringVarP(&flags.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", flags.ServiceName))
-	rootCmd.Flags().StringVarP(&flags.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	rootCmd.Flags().BoolVarP(&flags.Debug, "debug", "d", false, "pass to enable additional debug information")
+	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 }
 
 func getConfig(cfgFile string) (zitiCfg *config.Config) {
