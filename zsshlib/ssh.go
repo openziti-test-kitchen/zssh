@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -205,7 +204,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	}
 	defer func() { _ = rf.Close() }()
 
-	lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(remotePath)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
 	}
@@ -215,11 +214,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	if err != nil {
 		return fmt.Errorf("error copying remote file to local [%s] (%w)", remotePath, err)
 	}
-	logrus.Infof("%s => %s", remotePath, filepath.Join(localPath, remotePath))
+	logrus.Infof("%s => %s", remotePath, localPath)
 
 	return nil
-}
-
-func makeClient() {
-
 }

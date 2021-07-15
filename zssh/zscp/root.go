@@ -140,16 +140,15 @@ var (
 
 			if isCopyToRemote {
 				if recursive {
-					remoteDirPath := remoteFilePath
+					baseDir := filepath.Base(localFilePath)
 					err := filepath.WalkDir(localFilePath, func(path string, info fs.DirEntry, err error) error {
-						remotePath := filepath.Join(remoteDirPath, filepath.Base(path))
+						remotePath := filepath.Join(remoteFilePath, baseDir, after(path, baseDir))
 						if info.IsDir() {
 							err = client.Mkdir(remotePath)
-							remoteDirPath = filepath.Join(remoteDirPath, info.Name()) //gets file name from fs.DirEntry { info.name()}
 							if err != nil && debug {
 								logrus.Error(err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
 							} else if debug {
-								logrus.Infof("made directory: %s", path)
+								logrus.Infof("made directory: %s", remotePath)
 							}
 						} else {
 							err = zsshlib.SendFile(client, path, remotePath)
@@ -174,20 +173,19 @@ var (
 				}
 			} else {
 				if recursive {
-					localDirPath := localFilePath
+					baseDir := filepath.Base(remoteFilePath)
 					walker := client.Walk(remoteFilePath)
 					for walker.Step() {
-						localPath := filepath.Join(localDirPath, filepath.Base(walker.Path()))
+						localPath := filepath.Join(localFilePath, baseDir, after(walker.Path(), baseDir))
 						if walker.Stat().IsDir() {
 							err = os.Mkdir(localPath, os.ModePerm)
 							if debug && err != nil {
-								logrus.Errorf("failed to make directory: %s [%v]", localDirPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+								logrus.Errorf("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
 							} else if debug {
 								logrus.Infof("made directory: %s", localPath)
 							}
-							localDirPath = filepath.Join(localDirPath, filepath.Base(walker.Path()))
 						} else {
-							err = zsshlib.RetrieveRemoteFiles(client, localDirPath, walker.Path())
+							err = zsshlib.RetrieveRemoteFiles(client, localPath, walker.Path())
 							if err != nil {
 								logrus.Fatalf("failed to retrieve file: %s [%v]", walker.Path(), err)
 							}
@@ -227,4 +225,17 @@ func getConfig(cfgFile string) (zitiCfg *config.Config) {
 		log.Fatalf("failed to load ziti configuration file: %v", err)
 	}
 	return zitiCfg
+}
+
+func after(value string, a string) string {
+	// Get substring after a string.
+	pos := strings.LastIndex(value, a)
+	if pos == -1 {
+		return ""
+	}
+	adjustedPos := pos + len(a)
+	if adjustedPos >= len(value) {
+		return ""
+	}
+	return value[adjustedPos:len(value)]
 }
