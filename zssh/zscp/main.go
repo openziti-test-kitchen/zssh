@@ -211,12 +211,6 @@ func init() {
 	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
 }
 
-type ServiceConfig struct {
-	Protocol string
-	Hostname string
-	Port     int
-}
-
 func Execute() error {
 	return rootCmd.Execute()
 }

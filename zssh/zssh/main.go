@@ -106,12 +106,6 @@ func init() {
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
 }
 
-type ServiceConfig struct {
-	Protocol string
-	Hostname string
-	Port     int
-}
-
 func Execute() error {
 	return rootCmd.Execute()
 }
