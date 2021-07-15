@@ -24,7 +24,7 @@ var (
 	serviceName string
 
 	rootCmd = &cobra.Command{
-		Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
+		Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", serviceName),
 		Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
 		Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 		Args:  cobra.ExactValidArgs(1),
@@ -87,7 +87,7 @@ var (
 			}
 			svc, err := ctx.DialWithOptions(serviceName, dialOptions)
 			if err != nil {
-				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
+				logrus.Fatalf("error when dialing service name %s. %v", serviceName, err)
 			}
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
 			zclient, err := zsshlib.Dial(factory.Config(), svc)

@@ -114,7 +114,7 @@ var (
 
 			_, ok := ctx.GetService(serviceName)
 			if !ok {
-				logrus.Fatal("error when retrieving all the services for the provided config")
+				logrus.Fatalf("error when dialing service name %s. %v", serviceName, err)
 			}
 
 			dialOptions := &ziti.DialOptions{
@@ -131,11 +131,11 @@ var (
 			config := factory.Config()
 			sshConn, err := zsshlib.Dial(config, svc)
 			if err != nil {
-				logrus.Fatal(err, "error dialing SSH Conn")
+				logrus.Fatalf("error dialing SSH Conn: %v", err)
 			}
 			client, err := sftp.NewClient(sshConn)
 			if err != nil {
-				logrus.Fatal(err, "error creating sftp client")
+				logrus.Fatalf("error creating sftp client: %v", err)
 			}
 			defer func() { _ = client.Close() }()
 
