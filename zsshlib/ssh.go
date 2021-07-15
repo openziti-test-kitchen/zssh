@@ -274,7 +274,8 @@ func ParseTargetIdentity(input string) string {
 
 func ParseFilePath(input string) string {
 	if strings.Contains(input, ":") {
-		return strings.Split(input, ":")[1]
+		colPos := strings.Index(input, ":") + 1
+		return input[colPos:]
 	}
 	return input
 }
