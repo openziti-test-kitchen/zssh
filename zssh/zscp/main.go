@@ -71,7 +71,7 @@ var (
 				localFilePath = args[0]
 				isCopyToRemote = true
 			} else {
-				logrus.Fatal("cannot determine remote file PATH use \":\" for remote path")
+				logrus.Fatal(`cannot determine remote file PATH use ":" for remote path`)
 			}
 
 			localFilePath, err := filepath.Abs(localFilePath)
