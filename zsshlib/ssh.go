@@ -18,14 +18,12 @@ package zsshlib
 
 import (
 	"fmt"
-	"github.com/openziti/foundation/util/info"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -82,7 +80,6 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	}
 	return ssh.NewClient(c, chans, reqs), nil
 }
-
 
 type SshConfigFactory interface {
 	Address() string
@@ -176,21 +173,13 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 	}
 }
 
-func SendFile(factory SshConfigFactory, localPath string, remotePath string, conn net.Conn) error {
-	config := factory.Config()
+func SendFile(client *sftp.Client, localPath string, remotePath string) error {
+
 	localFile, err := ioutil.ReadFile(localPath)
 
 	if err != nil {
 		return errors.Wrapf(err, "unable to read local file %v", localFile)
 	}
-
-	defer func() { _ = conn.Close() }()
-	sshConn, err := Dial(config, conn)
-	client, err := sftp.NewClient(sshConn)
-	if err != nil {
-		return errors.Wrap(err, "error creating sftp client")
-	}
-	defer func() { _ = client.Close() }()
 
 	rmtFile, err := client.OpenFile(remotePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 
@@ -200,7 +189,6 @@ func SendFile(factory SshConfigFactory, localPath string, remotePath string, con
 	defer rmtFile.Close()
 
 	_, err = rmtFile.Write(localFile)
-
 	if err != nil {
 		return err
 	}
@@ -208,48 +196,25 @@ func SendFile(factory SshConfigFactory, localPath string, remotePath string, con
 	return nil
 }
 
-func RetrieveRemoteFiles(factory SshConfigFactory, conn net.Conn, localPath string, paths ...string) error {
-	if len(paths) < 1 {
-		return nil
-	}
+func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath string) error {
 
-	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
-		return fmt.Errorf("error creating local path: %s", localPath)
-	}
-
-	config := factory.Config()
-
-	sshConn, err := Dial(config,conn)
+	rf, err := client.Open(remotePath)
 	if err != nil {
-		return fmt.Errorf("error dialing zssh server (%w)", err)
+		return fmt.Errorf("error opening remote file [%s] (%w)", remotePath, err)
 	}
-	defer func() { _ = conn.Close() }()
+	defer func() { _ = rf.Close() }()
 
-	client, err := sftp.NewClient(sshConn)
+	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error creating sftp client (%w)", err)
+		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
 	}
-	defer func() { _ = client.Close() }()
+	defer func() { _ = lf.Close() }()
 
-	for _, path := range paths {
-		rf, err := client.Open(path)
-		if err != nil {
-			return fmt.Errorf("error opening remote file [%s] (%w)", path, err)
-		}
-		defer func() { _ = rf.Close() }()
-
-		lf, err := os.OpenFile(filepath.Join(localPath, filepath.Base(path)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("error opening local file [%s] (%w)", path, err)
-		}
-		defer func() { _ = lf.Close() }()
-
-		n, err := io.Copy(lf, rf)
-		if err != nil {
-			return fmt.Errorf("error copying remote file to local [%s] (%w)", path, err)
-		}
-		logrus.Infof("%s => %s", path, info.ByteCount(n))
+	_, err = io.Copy(lf, rf)
+	if err != nil {
+		return fmt.Errorf("error copying remote file to local [%s] (%w)", remotePath, err)
 	}
+	logrus.Infof("%s => %s", remotePath, localPath)
 
 	return nil
 }
