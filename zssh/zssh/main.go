@@ -106,10 +106,6 @@ func init() {
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
 }
 
-func Execute() error {
-	return rootCmd.Execute()
-}
-
 func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	zitiCfg, err := config.NewFromFile(cfgFile)
 	if err != nil {
@@ -119,5 +115,5 @@ func getConfig(cfgFile string) (zitiCfg *config.Config) {
 }
 
 func main() {
-	Execute()
+	_ = rootCmd.Execute()
 }

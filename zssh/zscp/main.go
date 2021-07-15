@@ -211,10 +211,6 @@ func init() {
 	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
 }
 
-func Execute() error {
-	return rootCmd.Execute()
-}
-
 func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	zitiCfg, err := config.NewFromFile(cfgFile)
 	if err != nil {
@@ -237,5 +233,5 @@ func after(value string, a string) string {
 }
 
 func main() {
-	Execute()
+	_ = rootCmd.Execute()
 }
