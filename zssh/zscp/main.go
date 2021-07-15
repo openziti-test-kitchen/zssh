@@ -36,7 +36,7 @@ var (
 			if SshKeyPath == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Fatalf("could not find UserHomeDir? %v", err)
 				}
 				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
 			}
@@ -47,7 +47,7 @@ var (
 			if ZConfig == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Fatalf("could not find UserHomeDir: %v", err)
 				}
 				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
 			}

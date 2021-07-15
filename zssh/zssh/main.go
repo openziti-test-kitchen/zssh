@@ -32,7 +32,7 @@ var (
 			if SshKeyPath == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Fatalf("could not find UserHomeDir? %v", err)
 				}
 				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
 			}
@@ -43,7 +43,7 @@ var (
 			if ZConfig == "" {
 				userHome, err := os.UserHomeDir()
 				if err != nil {
-					logrus.Fatal(err)
+					logrus.Fatalf("could not find UserHomeDir? %v", err)
 				}
 				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
 			}
@@ -77,7 +77,7 @@ var (
 
 			_, ok := ctx.GetService(serviceName)
 			if !ok {
-				logrus.Fatal("error when retrieving all the services for the provided config")
+				logrus.Fatalf("could not find service: %s", serviceName)
 			}
 
 			dialOptions := &ziti.DialOptions{
