@@ -2,13 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,8 +22,6 @@ var rootCmd = &cobra.Command{
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.ExactValidArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-
-		var username string
 		var remoteFilePath string
 		var localFilePath string
 		var isCopyToRemote bool
@@ -54,36 +49,12 @@ var rootCmd = &cobra.Command{
 
 		flags.DebugLog("           local path: %s", localFilePath)
 
-		username = zsshlib.ParseUserName(remoteFilePath)
-		targetIdentity := zsshlib.ParseTargetIdentity(remoteFilePath)
+		username, targetIdentity := flags.GetUserAndIdentity(remoteFilePath)
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		flags.DebugLog("      username set to: %s", username)
-		flags.DebugLog("targetIdentity set to: %s", targetIdentity)
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity)
+		defer func() { _ = sshConn.Close() }()
 
-		ctx := ziti.NewContextWithConfig(getConfig(flags.ZConfig))
-
-		_, ok := ctx.GetService(flags.ServiceName)
-		if !ok {
-			logrus.Fatalf("service not found: %s", flags.ServiceName)
-		}
-
-		dialOptions := &ziti.DialOptions{
-			ConnectTimeout: 0,
-			Identity:       targetIdentity,
-			AppData:        nil,
-		}
-		svc, err := ctx.DialWithOptions(flags.ServiceName, dialOptions)
-		defer func() { _ = svc.Close() }()
-		if err != nil {
-			logrus.Fatalf("error when dialing service name %s. %v", flags.ServiceName, err)
-		}
-		factory := zsshlib.NewSshConfigFactoryImpl(username, flags.SshKeyPath)
-		config := factory.Config()
-		sshConn, err := zsshlib.Dial(config, svc)
-		if err != nil {
-			logrus.Fatalf("error dialing SSH Conn: %v", err)
-		}
 		client, err := sftp.NewClient(sshConn)
 		if err != nil {
 			logrus.Fatalf("error creating sftp client: %v", err)
@@ -156,14 +127,6 @@ var rootCmd = &cobra.Command{
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
-}
-
-func getConfig(cfgFile string) (zitiCfg *config.Config) {
-	zitiCfg, err := config.NewFromFile(cfgFile)
-	if err != nil {
-		log.Fatalf("failed to load ziti configuration file: %v", err)
-	}
-	return zitiCfg
 }
 
 func after(value string, a string) string {

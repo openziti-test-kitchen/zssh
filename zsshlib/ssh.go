@@ -18,11 +18,14 @@ package zsshlib
 
 import (
 	"fmt"
+	"github.com/openziti/sdk-golang/ziti"
+	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"github.com/spf13/cobra"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/user"
@@ -43,10 +46,10 @@ const (
 )
 
 type SshFlags struct {
-	ZConfig     string
-	SshKeyPath  string
-	Debug       bool
-	ServiceName string
+	ZConfig        string
+	SshKeyPath     string
+	Debug          bool
+	ServiceName    string
 }
 
 type ScpFlags struct {
@@ -311,13 +314,47 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 		logrus.Infof(msg, args)
 	}
 }
-/*
-func (f *ScpFlags) DebugLog(msg string, args ...interface{}) {
-	if f.Debug {
-		logrus.Infof(msg, args)
+
+func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
+	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+
+	_, ok := ctx.GetService(f.ServiceName)
+	if !ok {
+		logrus.Fatalf("service not found: %s", f.ServiceName)
 	}
-}*/
 
-func EstablishClient() {
+	dialOptions := &ziti.DialOptions{
+		ConnectTimeout: 0,
+		Identity:       targetIdentity,
+		AppData:        nil,
+	}
+	svc, err := ctx.DialWithOptions(f.ServiceName, dialOptions)
 
+	if err != nil {
+		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
+	}
+
+	factory := NewSshConfigFactoryImpl(userName, f.SshKeyPath)
+	config := factory.Config()
+	sshConn, err := Dial(config, svc)
+	if err != nil {
+		logrus.Fatalf("error dialing SSH Conn: %v", err)
+	}
+	return sshConn
+}
+
+func getConfig(cfgFile string) (zitiCfg *config.Config) {
+	zitiCfg, err := config.NewFromFile(cfgFile)
+	if err != nil {
+		log.Fatalf("failed to load ziti configuration file: %v", err)
+	}
+	return zitiCfg
+}
+
+func (f *SshFlags) GetUserAndIdentity(input string) (string, string) {
+	username := ParseUserName(input)
+	f.DebugLog("      username set to: %s", username)
+	targetIdentity := ParseTargetIdentity(input)
+	f.DebugLog("targetIdentity set to: %s", targetIdentity)
+	return username, targetIdentity
 }
