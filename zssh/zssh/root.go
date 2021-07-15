@@ -18,9 +18,10 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	ZConfig    string
-	SshKeyPath string
-	debug      bool
+	ZConfig     string
+	SshKeyPath  string
+	debug       bool
+	serviceName string
 
 	rootCmd = &cobra.Command{
 		Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName),
@@ -74,7 +75,7 @@ var (
 
 			ctx := ziti.NewContextWithConfig(getConfig(ZConfig))
 
-			_, ok := ctx.GetService(ExpectedServiceAndExeName)
+			_, ok := ctx.GetService(serviceName)
 			if !ok {
 				logrus.Fatal("error when retrieving all the services for the provided config")
 			}
@@ -84,7 +85,7 @@ var (
 				Identity:       targetIdentity,
 				AppData:        nil,
 			}
-			svc, err := ctx.DialWithOptions(ExpectedServiceAndExeName, dialOptions)
+			svc, err := ctx.DialWithOptions(serviceName, dialOptions)
 			if err != nil {
 				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
 			}
@@ -94,15 +95,13 @@ var (
 				logrus.Fatal(err)
 			}
 			err = zsshlib.RemoteShell(zclient)
-			if err != nil {
-				logrus.Fatal("failed to open remote shell")
-			}
 		},
 	}
 )
 
 func init() {
-	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
+	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
+	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", serviceName))
 	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
 }

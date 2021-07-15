@@ -20,10 +20,11 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	ZConfig    string
-	SshKeyPath string
-	debug      bool
-	recursive  bool
+	ZConfig     string
+	SshKeyPath  string
+	debug       bool
+	recursive   bool
+	serviceName string
 
 	rootCmd = &cobra.Command{
 		Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
@@ -111,7 +112,7 @@ var (
 
 			ctx := ziti.NewContextWithConfig(getConfig(ZConfig))
 
-			_, ok := ctx.GetService(ExpectedServiceAndExeName)
+			_, ok := ctx.GetService(serviceName)
 			if !ok {
 				logrus.Fatal("error when retrieving all the services for the provided config")
 			}
@@ -121,10 +122,10 @@ var (
 				Identity:       targetIdentity,
 				AppData:        nil,
 			}
-			svc, err := ctx.DialWithOptions(ExpectedServiceAndExeName, dialOptions)
+			svc, err := ctx.DialWithOptions(serviceName, dialOptions)
 			defer func() { _ = svc.Close() }()
 			if err != nil {
-				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", ExpectedServiceAndExeName, err))
+				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", serviceName, err))
 			}
 			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
 			config := factory.Config()
@@ -203,10 +204,11 @@ var (
 )
 
 func init() {
-	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", ExpectedServiceAndExeName))
-	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
+	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("path to ziti config file. default: $HOME/.ziti/%s.json", serviceName))
+	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "path to ssh key. default: $HOME/.ssh/id_rsa")
 	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
 	rootCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "pass to enable recursive file transfer")
+	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
 }
 
 type ServiceConfig struct {
