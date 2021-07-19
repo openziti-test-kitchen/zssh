@@ -2,10 +2,8 @@ package zsshlib
 
 import (
 	"fmt"
-	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -23,29 +21,6 @@ type SshFlags struct {
 type ScpFlags struct {
 	SshFlags
 	Recursive bool
-}
-
-func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath string) error {
-
-	rf, err := client.Open(remotePath)
-	if err != nil {
-		return fmt.Errorf("error opening remote file [%s] (%w)", remotePath, err)
-	}
-	defer func() { _ = rf.Close() }()
-
-	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
-	}
-	defer func() { _ = lf.Close() }()
-
-	_, err = io.Copy(lf, rf)
-	if err != nil {
-		return fmt.Errorf("error copying remote file to local [%s] (%w)", remotePath, err)
-	}
-	logrus.Infof("%s => %s", remotePath, localPath)
-
-	return nil
 }
 
 func (f *SshFlags) GetUserAndIdentity(input string) (string, string) {
