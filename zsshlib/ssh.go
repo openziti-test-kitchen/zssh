@@ -41,20 +41,20 @@ import (
 )
 
 const (
-	ID_RSA = "id_rsa"
+	ID_RSA  = "id_rsa"
 	SSH_DIR = ".ssh"
 )
 
 type SshFlags struct {
-	ZConfig        string
-	SshKeyPath     string
-	Debug          bool
-	ServiceName    string
+	ZConfig     string
+	SshKeyPath  string
+	Debug       bool
+	ServiceName string
 }
 
 type ScpFlags struct {
 	SshFlags
-	Recursive   bool
+	Recursive bool
 }
 
 func RemoteShell(client *ssh.Client) error {
@@ -317,7 +317,6 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 
 func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
 	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
-
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
@@ -357,4 +356,19 @@ func (f *SshFlags) GetUserAndIdentity(input string) (string, string) {
 	targetIdentity := ParseTargetIdentity(input)
 	f.DebugLog("targetIdentity set to: %s", targetIdentity)
 	return username, targetIdentity
+}
+
+func checkRemotePath(c *sftp.Client, remotePath string, localPath string, debug bool) string {
+	localPath = filepath.Base(localPath)
+	if remotePath == "" {
+		remotePath = filepath.Base(localPath)
+	} else {
+		info, err := c.Lstat(remotePath)
+		if err == nil && info.IsDir() {
+			remotePath = filepath.Join(remotePath, localPath)
+		} else if debug {
+			logrus.Infof("Remote File/Directory: %s doesn't exist [%v]", remotePath, err)
+		}
+	}
+	return remotePath
 }

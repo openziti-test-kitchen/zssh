@@ -10,7 +10,7 @@ require (
 	github.com/openziti/sdk-golang v0.15.47
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/pkg/sftp v1.13.1
+	github.com/pkg/sftp v1.13.2
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
