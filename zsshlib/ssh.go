@@ -22,17 +22,12 @@ import (
 	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"github.com/spf13/cobra"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -44,18 +39,6 @@ const (
 	ID_RSA  = "id_rsa"
 	SSH_DIR = ".ssh"
 )
-
-type SshFlags struct {
-	ZConfig     string
-	SshKeyPath  string
-	Debug       bool
-	ServiceName string
-}
-
-type ScpFlags struct {
-	SshFlags
-	Recursive bool
-}
 
 func RemoteShell(client *ssh.Client) error {
 	session, err := client.NewSession()
@@ -221,100 +204,6 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	return nil
 }
 
-func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath string) error {
-
-	rf, err := client.Open(remotePath)
-	if err != nil {
-		return fmt.Errorf("error opening remote file [%s] (%w)", remotePath, err)
-	}
-	defer func() { _ = rf.Close() }()
-
-	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
-	}
-	defer func() { _ = lf.Close() }()
-
-	_, err = io.Copy(lf, rf)
-	if err != nil {
-		return fmt.Errorf("error copying remote file to local [%s] (%w)", remotePath, err)
-	}
-	logrus.Infof("%s => %s", remotePath, localPath)
-
-	return nil
-}
-
-func ParseUserName(input string) string {
-	var username string
-	if strings.ContainsAny(input, "@") {
-		userServiceName := strings.Split(input, "@")
-		username = userServiceName[0]
-	} else {
-		curUser, err := user.Current()
-		if err != nil {
-			logrus.Fatal(err)
-		}
-		username = curUser.Username
-		if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
-			username = strings.Split(username, "\\")[1]
-		}
-	}
-	return username
-}
-
-func ParseTargetIdentity(input string) string {
-	var targetIdentity string
-	if strings.ContainsAny(input, "@") {
-		targetIdentity = strings.Split(input, "@")[1]
-	} else {
-		targetIdentity = input
-	}
-
-	if strings.Contains(targetIdentity, ":") {
-		return strings.Split(targetIdentity, ":")[0]
-	}
-	return targetIdentity
-}
-
-func ParseFilePath(input string) string {
-	if strings.Contains(input, ":") {
-		colPos := strings.Index(input, ":") + 1
-		return input[colPos:]
-	}
-	return input
-}
-
-func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
-	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", exeName, fmt.Sprintf("service name. default: %s", exeName))
-	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", f.ServiceName))
-	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable additional debug information")
-
-	if f.SshKeyPath == "" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			logrus.Fatalf("could not find UserHomeDir? %v", err)
-		}
-		f.SshKeyPath = filepath.Join(userHome, SSH_DIR, ID_RSA)
-	}
-	f.DebugLog("    flags.SshKeyPath set to: %s", f.SshKeyPath)
-
-	if f.ZConfig == "" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			logrus.Fatalf("could not find UserHomeDir? %v", err)
-		}
-		f.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", exeName))
-	}
-	f.DebugLog("       ZConfig set to: %s", f.ZConfig)
-}
-
-func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
-	if f.Debug {
-		logrus.Infof(msg, args...)
-	}
-}
-
 func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
 	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
 	_, ok := ctx.GetService(f.ServiceName)
@@ -342,20 +231,18 @@ func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Cl
 	return sshConn
 }
 
+func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
+	if f.Debug {
+		logrus.Infof(msg, args...)
+	}
+}
+
 func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	zitiCfg, err := config.NewFromFile(cfgFile)
 	if err != nil {
 		log.Fatalf("failed to load ziti configuration file: %v", err)
 	}
 	return zitiCfg
-}
-
-func (f *SshFlags) GetUserAndIdentity(input string) (string, string) {
-	username := ParseUserName(input)
-	f.DebugLog("      username set to: %s", username)
-	targetIdentity := ParseTargetIdentity(input)
-	f.DebugLog("targetIdentity set to: %s", targetIdentity)
-	return username, targetIdentity
 }
 
 func checkRemotePath(c *sftp.Client, remotePath string, localPath string, debug bool) string {
