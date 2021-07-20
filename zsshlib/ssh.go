@@ -183,7 +183,6 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 }
 
 func SendFile(client *sftp.Client, localPath string, remotePath string) error {
-
 	localFile, err := ioutil.ReadFile(localPath)
 
 	if err != nil {
@@ -269,7 +268,8 @@ func getConfig(cfgFile string) (zitiCfg *config.Config) {
 	return zitiCfg
 }
 
-func checkRemotePath(c *sftp.Client, remotePath string, localPath string, debug bool) string {
+// AppendBaseName tags file name on back of remotePath if the path is blank or a directory/*
+func AppendBaseName(c *sftp.Client, remotePath string, localPath string, debug bool) string {
 	localPath = filepath.Base(localPath)
 	if remotePath == "" {
 		remotePath = filepath.Base(localPath)

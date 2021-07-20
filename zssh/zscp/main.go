@@ -77,6 +77,13 @@ var rootCmd = &cobra.Command{
 		}
 		defer func() { _ = client.Close() }()
 
+		if remoteFilePath == "~" {
+			remoteFilePath = ""
+		} else if strings.HasPrefix(remoteFilePath,"~/") {
+			remoteFilePath = after(remoteFilePath, "~/")
+		}
+
+
 		if isCopyToRemote {
 			if flags.Recursive {
 				baseDir := filepath.Base(localFilePath)
@@ -103,6 +110,7 @@ var rootCmd = &cobra.Command{
 					logrus.Fatal(err)
 				}
 			} else {
+				remoteFilePath = zsshlib.AppendBaseName(client, remoteFilePath, localFilePath, flags.Debug)
 				err = zsshlib.SendFile(client, localFilePath, remoteFilePath)
 				if err != nil {
 					logrus.Errorf("could not send file: %s [%v]", localFilePath, err)
@@ -131,6 +139,9 @@ var rootCmd = &cobra.Command{
 					}
 				}
 			} else {
+				if info, _ := os.Lstat(localFilePath); info.IsDir() {
+					localFilePath = filepath.Join(localFilePath, filepath.Base(remoteFilePath))
+				}
 				err = zsshlib.RetrieveRemoteFiles(client, localFilePath, remoteFilePath)
 				if err != nil {
 					logrus.Fatalf("failed to retrieve file: %s [%v]", remoteFilePath, err)

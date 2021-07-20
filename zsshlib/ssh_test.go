@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestCheckRemotePath(t *testing.T) {
+func TestAppendBaseName(t *testing.T) {
 	conn, _ := net.Dial("tcp", "localhost:3838")
 	userHome, _ := os.UserHomeDir()
 	factory := NewSshConfigFactoryImpl(getOsUser(), filepath.Join(userHome, SSH_DIR, ID_RSA))
@@ -20,15 +20,15 @@ func TestCheckRemotePath(t *testing.T) {
 	client, _ := sftp.NewClient(sshConn)
 	defer func() { _ = client.Close() }()
 
-	result := checkRemotePath(client, "", "message.txt", false)
+	result := appendBaseName(client, "", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = checkRemotePath(client, "~", "message.txt", false)
+	result = appendBaseName(client, "~", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = checkRemotePath(client, "/", "message.txt", false)
+	result = appendBaseName(client, "/", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = checkRemotePath(client, "message.txt", "message.txt", false)
+	result = appendBaseName(client, "message.txt", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 }
