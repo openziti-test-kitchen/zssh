@@ -84,7 +84,7 @@ var rootCmd = &cobra.Command{
 
 		if remoteFilePath == "~" {
 			remoteFilePath = ""
-		} else if remoteFilePath[:2] == "~/" {
+		} else if len(remoteFilePath) > 1 && remoteFilePath[:2] == "~/" {
 			remoteFilePath = after(remoteFilePath, "~/")
 		}
 
@@ -140,12 +140,13 @@ var rootCmd = &cobra.Command{
 				}
 			}
 		} else { //remote to local
+			localFilePath := localFilePaths[0]
 			for _, remoteFilePath = range remoteGlob {
 				if flags.Recursive {
 					baseDir := filepath.Base(remoteFilePath)
 					walker := client.Walk(remoteFilePath)
 					for walker.Step() {
-						localPath := filepath.Join(localFilePaths[0], baseDir, after(walker.Path(), baseDir)) //saves base directory to cut remote directory after it to append to localpath
+						localPath := filepath.Join(localFilePath, baseDir, after(walker.Path(), baseDir)) //saves base directory to cut remote directory after it to append to localpath
 						if walker.Stat().IsDir() {
 							err = os.Mkdir(localPath, os.ModePerm)
 							if err != nil {
@@ -162,9 +163,9 @@ var rootCmd = &cobra.Command{
 					}
 				} else {
 					if info, _ := os.Lstat(localFilePaths[0]); info.IsDir() {
-						localFilePaths[0] = filepath.Join(localFilePaths[0], filepath.Base(remoteFilePath))
+						localFilePath = filepath.Join(localFilePaths[0], filepath.Base(remoteFilePath))
 					}
-					err = zsshlib.RetrieveRemoteFiles(client, localFilePaths[0], remoteFilePath)
+					err = zsshlib.RetrieveRemoteFiles(client, localFilePath, remoteFilePath)
 					if err != nil {
 						logrus.Fatalf("failed to retrieve file: %s [%v]", remoteFilePath, err)
 					}
