@@ -39,7 +39,7 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		var remoteFilePath string
-		var localFilePaths[] string
+		var localFilePaths []string
 		var isCopyToRemote bool
 		var err error
 
@@ -53,7 +53,7 @@ var rootCmd = &cobra.Command{
 
 		} else if strings.ContainsAny(args[len(args)-1], ":") {
 			remoteFilePath = args[len(args)-1]
-			localFilePaths = args[0:len(args)-1]
+			localFilePaths = args[0 : len(args)-1]
 			isCopyToRemote = true
 		} else {
 			logrus.Fatal(`cannot determine remote file PATH use ":" for remote path`)
@@ -82,8 +82,14 @@ var rootCmd = &cobra.Command{
 		}
 		defer func() { _ = client.Close() }()
 
+		if remoteFilePath == "~" {
+			remoteFilePath = ""
+		} else if remoteFilePath[:2] == "~/" {
+			remoteFilePath = after(remoteFilePath, "~/")
+		}
+
 		remoteFilePath, err = client.RealPath(remoteFilePath)
-		if err != nil{
+		if err != nil {
 			logrus.Fatalf("cannot find remote file path: %s [%v]", remoteFilePath, err)
 		}
 
@@ -135,7 +141,7 @@ var rootCmd = &cobra.Command{
 			}
 		} else { //remote to local
 			for _, remoteFilePath = range remoteGlob {
-			if flags.Recursive {
+				if flags.Recursive {
 					baseDir := filepath.Base(remoteFilePath)
 					walker := client.Walk(remoteFilePath)
 					for walker.Step() {
