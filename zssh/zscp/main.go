@@ -1,155 +1,117 @@
+/*
+	Copyright NetFoundry, Inc.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+	https://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
 package main
 
 import (
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"io/fs"
-	"log"
 	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"zssh/zsshlib"
 )
 
 const ExpectedServiceAndExeName = "zssh"
 
-var (
-	ZConfig     string
-	SshKeyPath  string
-	debug       bool
-	recursive   bool
-	serviceName string
+var flags = &zsshlib.ScpFlags{}
+var rootCmd = &cobra.Command{
+	Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
+		"Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path]",
+	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
+	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+	Args:  cobra.MinimumNArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		var remoteFilePath string
+		var localFilePaths []string
+		var isCopyToRemote bool
+		var err error
 
-	rootCmd = &cobra.Command{
-		Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
-			"Local to Remote: zscp [Local Path] <remoteUsername>@<targetIdentity>:[Remote Path]",
-		Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
-		Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-		Args:  cobra.ExactValidArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			if SshKeyPath == "" {
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					logrus.Fatalf("could not find UserHomeDir? %v", err)
-				}
-				SshKeyPath = filepath.Join(userHome, ".ssh", "id_rsa")
+		if strings.ContainsAny(args[0], ":") {
+			remoteFilePath = args[0]
+			localFilePaths = args[1:]
+			if len(localFilePaths) > 1 {
+				logrus.Fatalf("remote to local cannot have more than two arguments")
 			}
-			if debug {
-				logrus.Infof("    sshKeyPath set to: %s", SshKeyPath)
-			}
+			isCopyToRemote = false
 
-			if ZConfig == "" {
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					logrus.Fatalf("could not find UserHomeDir: %v", err)
-				}
-				ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", ExpectedServiceAndExeName))
-			}
-			if debug {
-				logrus.Infof("       ZConfig set to: %s", ZConfig)
-			}
+		} else if strings.ContainsAny(args[len(args)-1], ":") {
+			remoteFilePath = args[len(args)-1]
+			localFilePaths = args[0 : len(args)-1]
+			isCopyToRemote = true
+		} else {
+			logrus.Fatal(`cannot determine remote file PATH use ":" for remote path`)
+		}
 
-			var username string
-			var targetIdentity string
-			var remoteFilePath string
-			var localFilePath string
-			var isCopyToRemote bool
-
-			if strings.ContainsAny(args[0], ":") {
-				remoteFilePath = args[0]
-				localFilePath = args[1]
-				isCopyToRemote = false
-
-			} else if strings.ContainsAny(args[1], ":") {
-				remoteFilePath = args[1]
-				localFilePath = args[0]
-				isCopyToRemote = true
-			} else {
-				logrus.Fatal(`cannot determine remote file PATH use ":" for remote path`)
-			}
-
-			localFilePath, err := filepath.Abs(localFilePath)
+		for i, path := range localFilePaths {
+			localFilePaths[i], err = filepath.Abs(path)
 			if err != nil {
-				logrus.Fatalf("cannot determine absolute local file path, unrecognized file name: %s", localFilePath)
+				logrus.Fatalf("cannot determine absolute local file path, unrecognized file name: %s", path)
 			}
-			if _, err := os.Stat(localFilePath); err != nil {
+			if _, err := os.Stat(localFilePaths[i]); err != nil {
 				logrus.Fatal(err)
 			}
+			flags.DebugLog("           local path: %s", localFilePaths[i])
+		}
 
-			if debug {
-				logrus.Infof("           local path: %s", localFilePath)
-			}
+		username, targetIdentity := flags.GetUserAndIdentity(remoteFilePath)
+		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-			fullRemoteFilePath := strings.Split(remoteFilePath, ":")
-			remoteFilePath = fullRemoteFilePath[1]
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity)
+		defer func() { _ = sshConn.Close() }()
 
-			if strings.ContainsAny(fullRemoteFilePath[0], "@") {
-				userServiceName := strings.Split(fullRemoteFilePath[0], "@")
-				username = userServiceName[0]
-				targetIdentity = userServiceName[1]
+		client, err := sftp.NewClient(sshConn)
+		if err != nil {
+			logrus.Fatalf("error creating sftp client: %v", err)
+		}
+		defer func() { _ = client.Close() }()
 
-			} else {
-				curUser, err := user.Current()
-				if err != nil {
-					logrus.Fatal(err)
-				}
-				username = curUser.Username
-				if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
-					username = strings.Split(username, "\\")[1]
-				}
-				targetIdentity = args[0]
-			}
-			if debug {
-				logrus.Infof("      username set to: %s", username)
-				logrus.Infof("targetIdentity set to: %s", targetIdentity)
-			}
+		if remoteFilePath == "~" {
+			remoteFilePath = ""
+		} else if len(remoteFilePath) > 1 && remoteFilePath[:2] == "~/" {
+			remoteFilePath = after(remoteFilePath, "~/")
+		}
 
-			ctx := ziti.NewContextWithConfig(getConfig(ZConfig))
+		remoteFilePath, err = client.RealPath(remoteFilePath)
+		if err != nil {
+			logrus.Fatalf("cannot find remote file path: %s [%v]", remoteFilePath, err)
+		}
 
-			_, ok := ctx.GetService(serviceName)
-			if !ok {
-				logrus.Fatalf("error when dialing service name %s. %v", serviceName, err)
-			}
+		remoteGlob, err := client.Glob(remoteFilePath)
+		if err != nil {
+			logrus.Fatalf("file pattern [%s] not recognized [%v]", remoteFilePath, err)
+		} else if remoteGlob == nil {
+			remoteGlob = append(remoteGlob, remoteFilePath)
+		}
 
-			dialOptions := &ziti.DialOptions{
-				ConnectTimeout: 0,
-				Identity:       targetIdentity,
-				AppData:        nil,
-			}
-			svc, err := ctx.DialWithOptions(serviceName, dialOptions)
-			defer func() { _ = svc.Close() }()
-			if err != nil {
-				logrus.Fatal(fmt.Sprintf("error when dialing service name %s. %v", serviceName, err))
-			}
-			factory := zsshlib.NewSshConfigFactoryImpl(username, SshKeyPath)
-			config := factory.Config()
-			sshConn, err := zsshlib.Dial(config, svc)
-			if err != nil {
-				logrus.Fatalf("error dialing SSH Conn: %v", err)
-			}
-			client, err := sftp.NewClient(sshConn)
-			if err != nil {
-				logrus.Fatalf("error creating sftp client: %v", err)
-			}
-			defer func() { _ = client.Close() }()
-
-			if isCopyToRemote {
-				if recursive {
+		if isCopyToRemote { //local to remote
+			for i, localFilePath := range localFilePaths {
+				if flags.Recursive {
 					baseDir := filepath.Base(localFilePath)
 					err := filepath.WalkDir(localFilePath, func(path string, info fs.DirEntry, err error) error {
 						remotePath := filepath.Join(remoteFilePath, baseDir, after(path, baseDir))
 						if info.IsDir() {
 							err = client.Mkdir(remotePath)
-							if err != nil && debug {
-								logrus.Error(err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
-							} else if debug {
-								logrus.Infof("made directory: %s", remotePath)
+							if err != nil {
+								flags.DebugLog("%s", err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+							} else {
+								flags.DebugLog("made directory: %s", remotePath)
 							}
 						} else {
 							err = zsshlib.SendFile(client, path, remotePath)
@@ -165,6 +127,10 @@ var (
 						logrus.Fatal(err)
 					}
 				} else {
+					if i > 0 {
+						remoteFilePath = filepath.Join(filepath.Dir(remoteFilePath), filepath.Base(localFilePath))
+					}
+					remoteFilePath = zsshlib.AppendBaseName(client, remoteFilePath, localFilePath, flags.Debug)
 					err = zsshlib.SendFile(client, localFilePath, remoteFilePath)
 					if err != nil {
 						logrus.Errorf("could not send file: %s [%v]", localFilePath, err)
@@ -172,18 +138,21 @@ var (
 						logrus.Infof("sent file: %s ==> %s", localFilePath, remoteFilePath)
 					}
 				}
-			} else {
-				if recursive {
+			}
+		} else { //remote to local
+			localFilePath := localFilePaths[0]
+			for _, remoteFilePath = range remoteGlob {
+				if flags.Recursive {
 					baseDir := filepath.Base(remoteFilePath)
 					walker := client.Walk(remoteFilePath)
 					for walker.Step() {
-						localPath := filepath.Join(localFilePath, baseDir, after(walker.Path(), baseDir))
+						localPath := filepath.Join(localFilePath, baseDir, after(walker.Path(), baseDir)) //saves base directory to cut remote directory after it to append to localpath
 						if walker.Stat().IsDir() {
 							err = os.Mkdir(localPath, os.ModePerm)
-							if debug && err != nil {
-								logrus.Errorf("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
-							} else if debug {
-								logrus.Infof("made directory: %s", localPath)
+							if err != nil {
+								flags.DebugLog("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+							} else {
+								flags.DebugLog("made directory: %s", localPath)
 							}
 						} else {
 							err = zsshlib.RetrieveRemoteFiles(client, localPath, walker.Path())
@@ -193,30 +162,22 @@ var (
 						}
 					}
 				} else {
+					if info, _ := os.Lstat(localFilePaths[0]); info.IsDir() {
+						localFilePath = filepath.Join(localFilePaths[0], filepath.Base(remoteFilePath))
+					}
 					err = zsshlib.RetrieveRemoteFiles(client, localFilePath, remoteFilePath)
 					if err != nil {
 						logrus.Fatalf("failed to retrieve file: %s [%v]", remoteFilePath, err)
 					}
 				}
 			}
-		},
-	}
-)
-
-func init() {
-	rootCmd.Flags().StringVarP(&ZConfig, "ZConfig", "c", "", fmt.Sprintf("path to ziti config file. default: $HOME/.ziti/%s.json", serviceName))
-	rootCmd.Flags().StringVarP(&SshKeyPath, "SshKeyPath", "i", "", "path to ssh key. default: $HOME/.ssh/id_rsa")
-	rootCmd.Flags().BoolVarP(&debug, "debug", "d", false, "pass to enable additional debug information")
-	rootCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "pass to enable recursive file transfer")
-	rootCmd.Flags().StringVarP(&serviceName, "service", "s", ExpectedServiceAndExeName, fmt.Sprintf("service name. default: %s", ExpectedServiceAndExeName))
+		}
+	},
 }
 
-func getConfig(cfgFile string) (zitiCfg *config.Config) {
-	zitiCfg, err := config.NewFromFile(cfgFile)
-	if err != nil {
-		log.Fatalf("failed to load ziti configuration file: %v", err)
-	}
-	return zitiCfg
+func init() {
+	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
+	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 
 func after(value string, a string) string {

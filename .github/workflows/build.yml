@@ -13,14 +13,20 @@ jobs:
       matrix:
         include:
          - os: ubuntu-latest
-           artifact_name: zssh
-           asset_name: zssh-linux-amd64
+           zssh_artifact_name: zssh
+           zssh_asset_name: zssh-linux-amd64
+           zscp_artifact_name: zscp
+           zscp_asset_name: zscp-linux-amd64
          - os: windows-latest
-           artifact_name: zssh.exe
-           asset_name: zssh-windows-amd64.exe
+           zssh_artifact_name: zssh.exe
+           zssh_asset_name: zssh-windows-amd64.exe
+           zscp_artifact_name: zscp.exe
+           zscp_asset_name: zscp-windows-amd64.exe
          - os: macos-latest
-           artifact_name: zssh
-           asset_name: zssh-macos-amd64
+           zssh_artifact_name: zssh
+           zssh_asset_name: zssh-macos-amd64
+           zscp_artifact_name: zscp
+           zscp_asset_name: zscp-macos-amd64
     steps:
     - uses: actions/checkout@v2
 
@@ -33,22 +39,20 @@ jobs:
       run: mkdir "${{ runner.workspace }}/build"
       
     - name: Build
-      run: go build -o ${{ runner.workspace }}/build ./... 
+      run: go build -o ${{ runner.workspace }}/build ./...
 
-    - name: Upload binaries to release
+    - name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ${{ runner.workspace }}/build/${{ matrix.artifact_name }}
-        asset_name: ${{ matrix.asset_name }}
-        tag: latest-tag
-        overwrite: true
-        release_name: latest-tagged-release
-        
-    - name: Upload binaries to release
+        file: ${{ runner.workspace }}/build/${{ matrix.zssh_artifact_name }}
+        asset_name: ${{ matrix.zssh_asset_name }}
+        tag: ${{ github.ref }}
+
+    - name: Upload zscp binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ${{ runner.workspace }}/build/${{ matrix.artifact_name }}
-        asset_name: ${{ matrix.asset_name }}
+        file: ${{ runner.workspace }}/build/${{ matrix.zscp_artifact_name }}
+        asset_name: ${{ matrix.zscp_asset_name }}
         tag: ${{ github.ref }}

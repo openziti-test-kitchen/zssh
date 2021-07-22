@@ -1,5 +1,5 @@
 /*
-	Copyright 2019 NetFoundry, Inc.
+	Copyright NetFoundry, Inc.
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -18,18 +18,27 @@ package zsshlib
 
 import (
 	"fmt"
+	"github.com/openziti/sdk-golang/ziti"
+	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
+)
+
+const (
+	ID_RSA  = "id_rsa"
+	SSH_DIR = ".ssh"
 )
 
 func RemoteShell(client *ssh.Client) error {
@@ -174,7 +183,6 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 }
 
 func SendFile(client *sftp.Client, localPath string, remotePath string) error {
-
 	localFile, err := ioutil.ReadFile(localPath)
 
 	if err != nil {
@@ -206,7 +214,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 
 	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
+		return fmt.Errorf("error opening local file [%s] (%w)", localPath, err)
 	}
 	defer func() { _ = lf.Close() }()
 
@@ -217,4 +225,61 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	logrus.Infof("%s => %s", remotePath, localPath)
 
 	return nil
+}
+
+func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
+	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+	_, ok := ctx.GetService(f.ServiceName)
+	if !ok {
+		logrus.Fatalf("service not found: %s", f.ServiceName)
+	}
+
+	dialOptions := &ziti.DialOptions{
+		ConnectTimeout: 0,
+		Identity:       targetIdentity,
+		AppData:        nil,
+	}
+	svc, err := ctx.DialWithOptions(f.ServiceName, dialOptions)
+
+	if err != nil {
+		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
+	}
+
+	factory := NewSshConfigFactoryImpl(userName, f.SshKeyPath)
+	config := factory.Config()
+	sshConn, err := Dial(config, svc)
+	if err != nil {
+		logrus.Fatalf("error dialing SSH Conn: %v", err)
+	}
+	return sshConn
+}
+
+func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
+	if f.Debug {
+		logrus.Infof(msg, args...)
+	}
+}
+
+func getConfig(cfgFile string) (zitiCfg *config.Config) {
+	zitiCfg, err := config.NewFromFile(cfgFile)
+	if err != nil {
+		log.Fatalf("failed to load ziti configuration file: %v", err)
+	}
+	return zitiCfg
+}
+
+// AppendBaseName tags file name on back of remotePath if the path is blank or a directory/*
+func AppendBaseName(c *sftp.Client, remotePath string, localPath string, debug bool) string {
+	localPath = filepath.Base(localPath)
+	if remotePath == "" {
+		remotePath = filepath.Base(localPath)
+	} else {
+		info, err := c.Lstat(remotePath)
+		if err == nil && info.IsDir() {
+			remotePath = filepath.Join(remotePath, localPath)
+		} else if debug {
+			logrus.Infof("Remote File/Directory: %s doesn't exist [%v]", remotePath, err)
+		}
+	}
+	return remotePath
 }
