@@ -214,7 +214,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 
 	lf, err := os.OpenFile(localPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error opening local file [%s] (%w)", remotePath, err)
+		return fmt.Errorf("error opening local file [%s] (%w)", localPath, err)
 	}
 	defer func() { _ = lf.Close() }()
 
