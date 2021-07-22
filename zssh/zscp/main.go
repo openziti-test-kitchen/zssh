@@ -106,6 +106,7 @@ var rootCmd = &cobra.Command{
 					baseDir := filepath.Base(localFilePath)
 					err := filepath.WalkDir(localFilePath, func(path string, info fs.DirEntry, err error) error {
 						remotePath := filepath.Join(remoteFilePath, baseDir, after(path, baseDir))
+						remotePath = strings.ReplaceAll(remotePath, `\`, `/`)
 						if info.IsDir() {
 							err = client.Mkdir(remotePath)
 							if err != nil {
@@ -131,6 +132,7 @@ var rootCmd = &cobra.Command{
 						remoteFilePath = filepath.Join(filepath.Dir(remoteFilePath), filepath.Base(localFilePath))
 					}
 					remoteFilePath = zsshlib.AppendBaseName(client, remoteFilePath, localFilePath, flags.Debug)
+					remoteFilePath = strings.ReplaceAll(remoteFilePath, `\`, `/`)
 					err = zsshlib.SendFile(client, localFilePath, remoteFilePath)
 					if err != nil {
 						logrus.Errorf("could not send file: %s [%v]", localFilePath, err)
