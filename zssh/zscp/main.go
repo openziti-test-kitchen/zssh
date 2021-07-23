@@ -84,8 +84,8 @@ var rootCmd = &cobra.Command{
 
 		if remoteFilePath == "~" {
 			remoteFilePath = ""
-		} else if len(remoteFilePath) > 1 && remoteFilePath[:2] == "~/" {
-			remoteFilePath = after(remoteFilePath, "~/")
+		} else if len(remoteFilePath) > 1 && remoteFilePath[0:1] == "~" {
+			remoteFilePath = remoteFilePath[2:]
 		}
 
 		remoteFilePath, err = client.RealPath(remoteFilePath)
