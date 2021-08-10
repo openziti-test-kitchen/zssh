@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/openziti/ziti/common/enrollment"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"zssh/zsshlib"
@@ -49,5 +50,6 @@ func init() {
 }
 
 func main() {
+	rootCmd.AddCommand(enrollment.NewEnrollCommand())
 	_ = rootCmd.Execute()
 }

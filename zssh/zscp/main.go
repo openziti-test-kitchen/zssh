@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/openziti/ziti/common/enrollment"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -25,7 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"zssh/zsshlib"
+	"zssh/zsshlib"go
 )
 
 const ExpectedServiceAndExeName = "zssh"
@@ -196,5 +197,6 @@ func after(value string, a string) string {
 }
 
 func main() {
+	rootCmd.AddCommand(enrollment.NewEnrollCommand())
 	_ = rootCmd.Execute()
 }

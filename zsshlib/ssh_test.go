@@ -20,15 +20,15 @@ func TestAppendBaseName(t *testing.T) {
 	client, _ := sftp.NewClient(sshConn)
 	defer func() { _ = client.Close() }()
 
-	result := appendBaseName(client, "", "message.txt", false)
+	result := AppendBaseName(client, "", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = appendBaseName(client, "~", "message.txt", false)
+	result = AppendBaseName(client, "~", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = appendBaseName(client, "/", "message.txt", false)
+	result = AppendBaseName(client, "/", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 
-	result = appendBaseName(client, "message.txt", "message.txt", false)
+	result = AppendBaseName(client, "message.txt", "message.txt", false)
 	assert.Equal(t, result, "message.txt", "Path not correct")
 }
