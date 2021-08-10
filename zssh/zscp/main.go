@@ -26,7 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"zssh/zsshlib"go
+	"zssh/zsshlib"
 )
 
 const ExpectedServiceAndExeName = "zssh"
