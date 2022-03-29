@@ -38,7 +38,7 @@ func sshAuthMethodAgent() ssh.AuthMethod {
 	} else {
 		warnOnce.Do(func() {
 			pipePresent = false
-			logrus.WithError(err).Warn("could not connect to openssh-ssh-agent pipe, is the ssh-agent service (OpenSSH Authentication Agent) running?")
+			logrus.WithError(err).Debug("could not connect to openssh-ssh-agent pipe, is the ssh-agent service (OpenSSH Authentication Agent) running?")
 		})
 	}
 	return nil

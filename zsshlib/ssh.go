@@ -74,11 +74,11 @@ func RemoteShell(client *ssh.Client) error {
 		return err
 	}
 
-	err = session.Run("/bin/bash")
+	err = session.Shell()
 	if err != nil {
 		return err
 	}
-
+	session.Wait()
 	return nil
 }
 
