@@ -51,5 +51,6 @@ func init() {
 
 func main() {
 	rootCmd.AddCommand(enrollment.NewEnrollCommand())
-	_ = rootCmd.Execute()
+	e := rootCmd.Execute()
+	logrus.Error(e)
 }

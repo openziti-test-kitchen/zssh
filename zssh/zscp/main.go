@@ -198,5 +198,6 @@ func after(value string, a string) string {
 
 func main() {
 	rootCmd.AddCommand(enrollment.NewEnrollCommand())
-	_ = rootCmd.Execute()
+	e := rootCmd.Execute()
+	logrus.Error(e)
 }
