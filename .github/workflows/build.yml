@@ -7,35 +7,38 @@ on:
 jobs:
   build:
     if: "!github.event.release.prerelease"
-    name: Building on ${{ matrix.os }}
+    name: Building ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
          - os: ubuntu-latest
+           arch: linux-amd64
            zssh_artifact_name: zssh
            zssh_asset_name: zssh-linux-amd64
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-linux-amd64
          - os: windows-latest
+           arch: windows-amd64
            zssh_artifact_name: zssh.exe
            zssh_asset_name: zssh-windows-amd64.exe
            zscp_artifact_name: zscp.exe
            zscp_asset_name: zscp-windows-amd64.exe
          - os: macos-latest
+           arch: macos-amd64
            zssh_artifact_name: zssh
            zssh_asset_name: zssh-macos-amd64
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-macos-amd64
          - os: ubuntu-latest
-           arch: arm
-           go_opts: CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64
+           arch: linux-arm
+           go_opts: CC=arm-linux-gnueabi-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm
            zssh_artifact_name: zssh
            zssh_asset_name: zssh-linux-arm
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-linux-arm
          - os: ubuntu-latest
-           arch: arm64
+           arch: linux-arm64
            go_opts: CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64
            zssh_artifact_name: zssh
            zssh_asset_name: zssh-linux-arm64
@@ -49,11 +52,11 @@ jobs:
       with:
         go-version: 1.18
 
-    - if: ${{ matrix.arch=='arm' }}
+    - if: ${{ matrix.arch=='linux-arm' }}
       name: Install gcc for arm
       run: sudo apt-get install gcc-arm-linux-gnueabi -y
       
-    - if: ${{ matrix.arch=='arm64' }}
+    - if: ${{ matrix.arch=='linux-arm64' }}
       name: Install gcc for arm 64
       run: sudo apt-get install gcc-aarch64-linux-gnu -y
       
@@ -63,7 +66,8 @@ jobs:
     - name: Build
       run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build ./...
 
-    - name: Upload zssh binaries to release
+    - if: github.ref == 'refs/heads/main'
+      name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -71,7 +75,8 @@ jobs:
         asset_name: ${{ matrix.zssh_asset_name }}
         tag: ${{ github.ref }}
 
-    - name: Upload zscp binaries to release
+    - if: github.ref == 'refs/heads/main'
+      name: Upload zscp binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
