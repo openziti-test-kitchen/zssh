@@ -27,19 +27,41 @@ jobs:
            zssh_asset_name: zssh-macos-amd64
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-macos-amd64
+         - os: ubuntu-latest
+           arch: arm
+           go_opts: CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64
+           zssh_artifact_name: zssh
+           zssh_asset_name: zssh-linux-arm
+           zscp_artifact_name: zscp
+           zscp_asset_name: zscp-linux-arm
+         - os: ubuntu-latest
+           arch: arm64
+           go_opts: CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64
+           zssh_artifact_name: zssh
+           zssh_asset_name: zssh-linux-arm64
+           zscp_artifact_name: zscp
+           zscp_asset_name: zscp-linux-arm64
     steps:
     - uses: actions/checkout@v2
 
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.17
+        go-version: 1.18
 
+    - if: ${{ matrix.arch=='arm' }}
+      name: Install gcc for arm
+      run: sudo apt-get install gcc-arm-linux-gnueabi -y
+      
+    - if: ${{ matrix.arch=='arm64' }}
+      name: Install gcc for arm 64
+      run: sudo apt-get install gcc-aarch64-linux-gnu -y
+      
     - name: Make the build dir
       run: mkdir "${{ runner.workspace }}/build"
       
     - name: Build
-      run: go build -o ${{ runner.workspace }}/build ./...
+      run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build ./...
 
     - name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
