@@ -66,8 +66,7 @@ jobs:
     - name: Build
       run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build ./...
 
-    - if: github.ref == 'refs/heads/main'
-      name: Upload zssh binaries to release
+    - name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -75,8 +74,7 @@ jobs:
         asset_name: ${{ matrix.zssh_asset_name }}
         tag: ${{ github.ref }}
 
-    - if: github.ref == 'refs/heads/main'
-      name: Upload zscp binaries to release
+    - name: Upload zscp binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
