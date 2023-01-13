@@ -50,7 +50,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18
+        go-version: 1.19
 
     - if: ${{ matrix.arch=='linux-arm' }}
       name: Install gcc for arm
