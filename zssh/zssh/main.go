@@ -19,8 +19,10 @@ package main
 import (
 	"fmt"
 	"github.com/openziti/ziti/common/enrollment"
+	"github.com/openziti/ziti/ziti/cmd/common"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"os"
 	"zssh/zsshlib"
 )
 
@@ -50,7 +52,8 @@ func init() {
 }
 
 func main() {
-	rootCmd.AddCommand(enrollment.NewEnrollCommand())
+	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
+	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)
