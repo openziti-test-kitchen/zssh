@@ -67,5 +67,12 @@ ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols
 ziti edge create service "${service_name}" --configs "${service_name}.intercept.v1","${service_name}.host.v1"
 ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders"
 ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers"
+```
 
+If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
+```
+ziti edge delete service-policy where 'name contains "'${service_name}'"'
+ziti edge delete service where 'name contains "'${service_name}'"'
+ziti edge delete config where 'name contains "'${service_name}'"'
+ziti edge delete identity where 'name contains "'${service_name}'"'
 ```
