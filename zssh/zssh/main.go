@@ -17,13 +17,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"zssh/zsshlib"
+
 	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"zssh/zsshlib"
 )
 
 const ExpectedServiceAndExeName = "zssh"
@@ -51,9 +53,47 @@ func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 }
 
+// AuthCmd holds the required data for the init cmd
+type AuthCmd struct {
+	common.OptionsProvider
+}
+
+func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
+	cmd := &AuthCmd{OptionsProvider: p}
+
+	authCmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Authenticate account with Okta to get OAuth 2.0 token",
+		Long:  `Force authentication against Okta to get OAuth 2.0 token.`,
+		Args:  cobra.NoArgs,
+		RunE:  cmd.Run,
+	}
+
+	return authCmd
+}
+
+func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
+	cfg := &zsshlib.Config{
+		ClientID:     "0oa8wkmtfcyySlZQa5d7",
+		ClientSecret: "ZGyJfx1UThqoy6RfMUqqg8S9mUxVqtg16WMNsXIS",
+		Logf:         logrus.Debugf,
+	}
+
+	ctx := context.Background()
+	token, err := zsshlib.GetToken(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("token: %s", token)
+
+	return nil
+}
+
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)

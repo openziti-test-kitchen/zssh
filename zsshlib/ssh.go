@@ -17,11 +17,8 @@
 package zsshlib
 
 import (
+	"context"
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
-	"github.com/pkg/errors"
-	"github.com/pkg/sftp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -31,6 +28,16 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/int128/oauth2cli"
+	"golang.org/x/oauth2"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/openziti/sdk-golang/ziti"
+	"github.com/openziti/sdk-golang/ziti/config"
+	"github.com/pkg/browser"
+	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
+
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -39,6 +46,21 @@ import (
 const (
 	ID_RSA  = "id_rsa"
 	SSH_DIR = ".ssh"
+)
+
+var (
+	// OktaAuthEndpoint is the Okta authentication endpoint.
+	OktaAuthEndpoint = oauth2.Endpoint{
+		AuthURL:   "https://dev-82868739.okta.com/oauth2/v1/authorize",
+		TokenURL:  "https://dev-82868739.okta.com/oauth2/v1/token",
+		AuthStyle: oauth2.AuthStyleInParams,
+	}
+
+	// OktaAuthScope is the Okta authorization scope(s).
+	//OktaAuthScope = "okta.users.read.self"
+	OktaAuthScope = "okta.users.read.self"
+
+	ErrTokenIsNil = errors.New("OAuth 2.0 token is nil")
 )
 
 func RemoteShell(client *ssh.Client) error {
@@ -88,6 +110,100 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// Config represents a config for the OAuth 2.0 flow.
+type Config struct {
+	// ClientID is the application's ID.
+	ClientID string
+
+	// ClientSecret is the application's secret.
+	ClientSecret string
+
+	// Logger function for debug.
+	Logf func(format string, args ...interface{})
+
+	oAuth2Config *oauth2.Config
+}
+
+// GetToken create a new OAuth2 token
+func GetToken(ctx context.Context, config *Config) (*oauth2.Token, error) {
+	if err := config.validateAndSetDefaults(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return config.getTokenFromWeb(ctx)
+}
+
+// validateAndSetDefaults validates the config and sets default values.
+func (c *Config) validateAndSetDefaults() error {
+	if c.ClientID == "" {
+		return fmt.Errorf("ClientID must be set")
+	}
+
+	//if c.ClientID == "" || c.ClientSecret == "" {
+	//	return fmt.Errorf("both ClientID and ClientSecret must be set")
+	//}
+
+	if c.Logf == nil {
+		c.Logf = func(string, ...interface{}) {}
+	}
+
+	c.oAuth2Config = &oauth2.Config{
+		ClientID:     c.ClientID,
+		ClientSecret: c.ClientSecret,
+		Scopes:       []string{OktaAuthScope},
+		Endpoint:     OktaAuthEndpoint,
+	}
+
+	return nil
+}
+
+// getTokenFromWeb starts a local HTTP server, opens the web browser to initiate the OAuth 2.0 flow,
+// blocks until the user completes authorization and is redirected back, and returns the access token.
+func (c *Config) getTokenFromWeb(ctx context.Context) (*oauth2.Token, error) {
+	//pkce, err := oauth2params.NewPKCE()
+	//if err != nil {
+	//	log.Fatalf("Error generating PKCE: %v", err)
+	//}
+	ready := make(chan string, 1)
+	defer close(ready)
+	cfg := oauth2cli.Config{
+		OAuth2Config:           *c.oAuth2Config,
+		LocalServerReadyChan:   ready,
+		LocalServerBindAddress: []string{"localhost:63275"},
+		//AuthCodeOptions:        pkce.AuthCodeOptions(),
+		//TokenRequestOptions:    pkce.TokenRequestOptions(),
+		Logf: c.Logf,
+	}
+
+	var token *oauth2.Token
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		select {
+		case url := <-ready:
+			log.Printf("Open %s", url)
+			if err := browser.OpenURL(url); err != nil {
+				log.Printf("could not open browser: %v", err)
+			}
+			return nil
+		case <-ctx.Done():
+			return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
+		}
+	})
+	eg.Go(func() error {
+		token, err := oauth2cli.GetToken(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("could not get token: %w", err)
+		}
+		log.Printf("You got a valid token until %s", token.Expiry)
+		return nil
+	})
+	// if err := eg.Wait(); err != nil {
+	// 	log.Fatalf("authorization error: %s", err)
+	// }
+
+	return token, eg.Wait()
 }
 
 type SshConfigFactory interface {
@@ -229,6 +345,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 
 func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
 	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
