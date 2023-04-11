@@ -18,25 +18,30 @@ package zsshlib
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/gorilla/securecookie"
+	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
-
-	"github.com/int128/oauth2cli"
-	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
+	"time"
 
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/openziti/sdk-golang/ziti/config"
-	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
+	"github.com/zitadel/oidc/v2/pkg/client/rp"
+	httphelper "github.com/zitadel/oidc/v2/pkg/http"
+	"golang.org/x/oauth2"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -58,7 +63,7 @@ var (
 
 	// OktaAuthScope is the Okta authorization scope(s).
 	//OktaAuthScope = "okta.users.read.self"
-	OktaAuthScope = "okta.users.read.self"
+	OktaAuthScope = "okta.users.read.self openid profile"
 
 	ErrTokenIsNil = errors.New("OAuth 2.0 token is nil")
 )
@@ -114,16 +119,25 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 
 // Config represents a config for the OAuth 2.0 flow.
 type Config struct {
-	// ClientID is the application's ID.
-	ClientID string
+	// CallbackPath is the path of the callback handler.
+	CallbackPath string
 
-	// ClientSecret is the application's secret.
-	ClientSecret string
+	// CallbackPort is the port of the callback handler.
+	CallbackPort string
+
+	// Issuer is the URL of the OpenID Connect provider.
+	Issuer string
+
+	// HashKey is used to authenticate values using HMAC.
+	HashKey []byte
+
+	// BlockKey is used to encrypt values using AES.
+	BlockKey []byte
 
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
 
-	oAuth2Config *oauth2.Config
+	oauth2.Config
 }
 
 // GetToken create a new OAuth2 token
@@ -145,16 +159,15 @@ func (c *Config) validateAndSetDefaults() error {
 	//	return fmt.Errorf("both ClientID and ClientSecret must be set")
 	//}
 
+	c.HashKey = securecookie.GenerateRandomKey(32)
+	c.BlockKey = securecookie.GenerateRandomKey(32)
+
 	if c.Logf == nil {
 		c.Logf = func(string, ...interface{}) {}
 	}
 
-	c.oAuth2Config = &oauth2.Config{
-		ClientID:     c.ClientID,
-		ClientSecret: c.ClientSecret,
-		Scopes:       []string{OktaAuthScope},
-		Endpoint:     OktaAuthEndpoint,
-	}
+	c.Scopes = strings.Split(OktaAuthScope, " ")
+	c.Endpoint = OktaAuthEndpoint
 
 	return nil
 }
@@ -162,48 +175,97 @@ func (c *Config) validateAndSetDefaults() error {
 // getTokenFromWeb starts a local HTTP server, opens the web browser to initiate the OAuth 2.0 flow,
 // blocks until the user completes authorization and is redirected back, and returns the access token.
 func (c *Config) getTokenFromWeb(ctx context.Context) (*oauth2.Token, error) {
-	//pkce, err := oauth2params.NewPKCE()
-	//if err != nil {
-	//	log.Fatalf("Error generating PKCE: %v", err)
-	//}
-	ready := make(chan string, 1)
-	defer close(ready)
-	cfg := oauth2cli.Config{
-		OAuth2Config:           *c.oAuth2Config,
-		LocalServerReadyChan:   ready,
-		LocalServerBindAddress: []string{"localhost:63275"},
-		//AuthCodeOptions:        pkce.AuthCodeOptions(),
-		//TokenRequestOptions:    pkce.TokenRequestOptions(),
-		Logf: c.Logf,
+	cookieHandler := httphelper.NewCookieHandler(c.HashKey, c.BlockKey, httphelper.WithUnsecure())
+
+	options := []rp.Option{
+		rp.WithCookieHandler(cookieHandler),
+		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
+	}
+	if c.ClientSecret == "" {
+		options = append(options, rp.WithPKCE(cookieHandler))
 	}
 
-	var token *oauth2.Token
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		select {
-		case url := <-ready:
-			log.Printf("Open %s", url)
-			if err := browser.OpenURL(url); err != nil {
-				log.Printf("could not open browser: %v", err)
-			}
-			return nil
-		case <-ctx.Done():
-			return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
-		}
-	})
-	eg.Go(func() error {
-		token, err := oauth2cli.GetToken(ctx, cfg)
-		if err != nil {
-			return fmt.Errorf("could not get token: %w", err)
-		}
-		log.Printf("You got a valid token until %s", token.Expiry)
-		return nil
-	})
-	// if err := eg.Wait(); err != nil {
-	// 	log.Fatalf("authorization error: %s", err)
-	// }
+	provider, err := rp.NewRelyingPartyOIDC(c.Issuer, c.ClientID, c.ClientSecret, c.RedirectURL, c.Scopes, options...)
+	if err != nil {
+		logrus.Fatalf("error creating provider %s", err.Error())
+	}
 
-	return token, eg.Wait()
+	state := func() string {
+		return uuid.New().String()
+	}
+
+	http.Handle("/", rp.AuthURLHandler(state, provider, rp.WithPromptURLParam("Welcome back!")))
+
+	//marshalUserinfo := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty, info *oidc.UserInfo) {
+	//	data, err := json.Marshal(info)
+	//	if err != nil {
+	//		http.Error(w, err.Error(), http.StatusInternalServerError)
+	//		return
+	//	}
+	//	w.Write(data)
+	//}
+
+	marshalToken := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty) {
+		data, err := json.Marshal(tokens)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+	}
+
+	// register the CodeExchangeHandler at the callbackPath
+	// the CodeExchangeHandler handles the auth response, creates the token request and calls the callback function
+	// with the returned tokens from the token endpoint
+	// in this example the callback function itself is wrapped by the UserinfoCallback which
+	// will call the Userinfo endpoint, check the sub and pass the info into the callback function
+	//http.Handle(c.CallbackPath, rp.CodeExchangeHandler(rp.UserinfoCallback(marshalUserinfo), provider))
+
+	// if you would use the callback without calling the userinfo endpoint, simply switch the callback handler for:
+	//
+	http.Handle(c.CallbackPath, rp.CodeExchangeHandler(marshalToken, provider))
+
+	lis := fmt.Sprintf("127.0.0.1:%s", c.CallbackPort)
+	logrus.Infof("listening on http://%s/", lis)
+	logrus.Info("press ctrl+c to stop")
+	logrus.Fatal(http.ListenAndServe(lis, nil))
+
+	//ready := make(chan string, 1)
+	//defer close(ready)
+	//cfg := oauth2cli.Config{
+	//	OAuth2Config:           *c.oAuth2Config,
+	//	LocalServerReadyChan:   ready,
+	//	LocalServerBindAddress: []string{"localhost:63275"},
+	//	Logf:                   c.Logf,
+	//}
+	//
+	//var token *oauth2.Token
+	//eg, ctx := errgroup.WithContext(ctx)
+	//eg.Go(func() error {
+	//	select {
+	//	case url := <-ready:
+	//		log.Printf("Open %s", url)
+	//		if err := browser.OpenURL(url); err != nil {
+	//			log.Printf("could not open browser: %v", err)
+	//		}
+	//		return nil
+	//	case <-ctx.Done():
+	//		return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
+	//	}
+	//})
+	//eg.Go(func() error {
+	//	token, err := oauth2cli.GetToken(ctx, cfg)
+	//	if err != nil {
+	//		return fmt.Errorf("could not get token: %w", err)
+	//	}
+	//	log.Printf("You got a valid token until %s", token.Expiry)
+	//	return nil
+	//})
+	//// if err := eg.Wait(); err != nil {
+	//// 	log.Fatalf("authorization error: %s", err)
+	//// }
+
+	return nil, nil
 }
 
 type SshConfigFactory interface {

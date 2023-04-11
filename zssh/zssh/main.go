@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"golang.org/x/oauth2"
 	"os"
 	"zssh/zsshlib"
 
@@ -30,7 +31,10 @@ import (
 
 const ExpectedServiceAndExeName = "zssh"
 
-var flags = zsshlib.SshFlags{}
+var (
+	callbackPath = "/auth/callback"
+	flags        = zsshlib.SshFlags{}
+)
 
 var rootCmd = &cobra.Command{
 	Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", flags.ServiceName),
@@ -74,8 +78,14 @@ func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
 
 func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
 	cfg := &zsshlib.Config{
-		ClientID:     "0oa8wkmtfcyySlZQa5d7",
-		ClientSecret: "ZGyJfx1UThqoy6RfMUqqg8S9mUxVqtg16WMNsXIS",
+		Config: oauth2.Config{
+			ClientID:     flags.ClientID,
+			ClientSecret: "",
+			RedirectURL:  fmt.Sprintf("http://localhost:%v%v", flags.CallbackPort, callbackPath),
+		},
+		CallbackPath: callbackPath,
+		CallbackPort: flags.CallbackPort,
+		Issuer:       flags.OIDCIssuer,
 		Logf:         logrus.Debugf,
 	}
 
