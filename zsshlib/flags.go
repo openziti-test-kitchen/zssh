@@ -15,10 +15,12 @@ import (
 type SshFlags struct {
 	CallbackPort string
 	ClientID     string
+	ClientSecret string
 	OIDCIssuer   string
 	ZConfig      string
 	SshKeyPath   string
 	Debug        bool
+	OIDCMode     bool
 	ServiceName  string
 }
 
@@ -75,13 +77,19 @@ func ParseFilePath(input string) string {
 	return input
 }
 
+// TODO: Add config file support
+func (f *SshFlags) OIDCFlags(cmd *cobra.Command, exeName string) {
+	cmd.Flags().StringVarP(&f.CallbackPort, "CallbackPort", "p", "63275", "Port for Callback. default: 63275")
+	cmd.Flags().StringVarP(&f.ClientID, "ClientID", "n", "12345678", "IdP ClientID. default: 12345678")
+	cmd.Flags().StringVarP(&f.ClientSecret, "ClientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
+	cmd.Flags().StringVarP(&f.OIDCIssuer, "OIDCIssuer", "a", "https://dev-yourid.okta.com", "URL of the OpenID Connect provider. default: https://dev-yourid.okta.com")
+	cmd.Flags().BoolVarP(&f.OIDCMode, "oidc", "o", false, "toggle OIDC mode. default: false")
+}
+
 func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
 	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", exeName, fmt.Sprintf("service name. default: %s", exeName))
 	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: $HOME/.ziti/%s.json", f.ServiceName))
 	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.Flags().StringVarP(&f.CallbackPort, "CallbackPort", "p", "63275", "Port for Callback. default: 63275")
-	cmd.Flags().StringVarP(&f.ClientID, "ClientID", "n", "0oa8wkmtfcyySlZQa5d7", "IdP ClientID. default: 0oa8wkmtfcyySlZQa5d7")
-	cmd.Flags().StringVarP(&f.OIDCIssuer, "OIDCIssuer", "a", "https://dev-82868739.okta.com", "URL of the OpenID Connect provider. default: https://dev-82868739.okta.com")
 	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable additional debug information")
 
 	if f.SshKeyPath == "" {

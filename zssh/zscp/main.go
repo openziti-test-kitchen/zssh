@@ -45,6 +45,9 @@ var rootCmd = &cobra.Command{
 		var isCopyToRemote bool
 		var err error
 
+		// token is the ID token from the OIDC flow
+		token := "" // TODO: implement OIDC flow
+
 		if strings.ContainsAny(args[0], ":") {
 			remoteFilePath = args[0]
 			localFilePaths = args[1:]
@@ -75,7 +78,7 @@ var rootCmd = &cobra.Command{
 		username, targetIdentity := flags.GetUserAndIdentity(remoteFilePath)
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity)
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
 
 		client, err := sftp.NewClient(sshConn)

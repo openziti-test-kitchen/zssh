@@ -18,16 +18,16 @@ package zsshlib
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
+	edge_apis "github.com/openziti/sdk-golang/edge-apis"
+	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,7 +36,6 @@ import (
 	"time"
 
 	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"github.com/zitadel/oidc/v2/pkg/client/rp"
@@ -54,18 +53,11 @@ const (
 )
 
 var (
-	// OktaAuthEndpoint is the Okta authentication endpoint.
-	OktaAuthEndpoint = oauth2.Endpoint{
-		AuthURL:   "https://dev-82868739.okta.com/oauth2/v1/authorize",
-		TokenURL:  "https://dev-82868739.okta.com/oauth2/v1/token",
-		AuthStyle: oauth2.AuthStyleInParams,
-	}
-
 	// OktaAuthScope is the Okta authorization scope(s).
-	//OktaAuthScope = "okta.users.read.self"
-	OktaAuthScope = "okta.users.read.self openid profile"
+	OktaAuthScope = "openid profile"
+	//OktaAuthScope = "okta.users.read.self openid profile"
 
-	ErrTokenIsNil = errors.New("OAuth 2.0 token is nil")
+	ErrTokenIsNil = errors.New("ID token is nil")
 )
 
 func RemoteShell(client *ssh.Client) error {
@@ -117,7 +109,7 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-// Config represents a config for the OAuth 2.0 flow.
+// Config represents a config for the OIDC auth flow.
 type Config struct {
 	// CallbackPath is the path of the callback handler.
 	CallbackPath string
@@ -134,19 +126,47 @@ type Config struct {
 	// BlockKey is used to encrypt values using AES.
 	BlockKey []byte
 
+	// IDToken is the ID token returned by the OIDC provider.
+	IDToken string
+
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
 
 	oauth2.Config
 }
 
-// GetToken create a new OAuth2 token
-func GetToken(ctx context.Context, config *Config) (*oauth2.Token, error) {
+// GetToken starts a local HTTP server, opens the web browser to initiate the OIDC Discovery and
+// Token Exchange flow, blocks until the user completes authentication and is redirected back, and returns
+// the OIDC tokens.
+func GetToken(ctx context.Context, config *Config) (string, error) {
 	if err := config.validateAndSetDefaults(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+		return "", fmt.Errorf("invalid config: %w", err)
 	}
 
-	return config.getTokenFromWeb(ctx)
+	cookieHandler := httphelper.NewCookieHandler(config.HashKey, config.BlockKey, httphelper.WithUnsecure())
+
+	options := []rp.Option{
+		rp.WithCookieHandler(cookieHandler),
+		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
+	}
+	if config.ClientSecret == "" {
+		options = append(options, rp.WithPKCE(cookieHandler))
+	}
+
+	relyingParty, err := rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
+	if err != nil {
+		logrus.Fatalf("error creating relyingParty %s", err.Error())
+	}
+
+	//ctx := context.Background()
+	state := func() string {
+		return uuid.New().String()
+	}
+
+	tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
+
+	return tokens.IDToken, nil
+	//return "", nil
 }
 
 // validateAndSetDefaults validates the config and sets default values.
@@ -154,10 +174,6 @@ func (c *Config) validateAndSetDefaults() error {
 	if c.ClientID == "" {
 		return fmt.Errorf("ClientID must be set")
 	}
-
-	//if c.ClientID == "" || c.ClientSecret == "" {
-	//	return fmt.Errorf("both ClientID and ClientSecret must be set")
-	//}
 
 	c.HashKey = securecookie.GenerateRandomKey(32)
 	c.BlockKey = securecookie.GenerateRandomKey(32)
@@ -167,105 +183,8 @@ func (c *Config) validateAndSetDefaults() error {
 	}
 
 	c.Scopes = strings.Split(OktaAuthScope, " ")
-	c.Endpoint = OktaAuthEndpoint
 
 	return nil
-}
-
-// getTokenFromWeb starts a local HTTP server, opens the web browser to initiate the OAuth 2.0 flow,
-// blocks until the user completes authorization and is redirected back, and returns the access token.
-func (c *Config) getTokenFromWeb(ctx context.Context) (*oauth2.Token, error) {
-	cookieHandler := httphelper.NewCookieHandler(c.HashKey, c.BlockKey, httphelper.WithUnsecure())
-
-	options := []rp.Option{
-		rp.WithCookieHandler(cookieHandler),
-		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
-	}
-	if c.ClientSecret == "" {
-		options = append(options, rp.WithPKCE(cookieHandler))
-	}
-
-	provider, err := rp.NewRelyingPartyOIDC(c.Issuer, c.ClientID, c.ClientSecret, c.RedirectURL, c.Scopes, options...)
-	if err != nil {
-		logrus.Fatalf("error creating provider %s", err.Error())
-	}
-
-	state := func() string {
-		return uuid.New().String()
-	}
-
-	http.Handle("/", rp.AuthURLHandler(state, provider, rp.WithPromptURLParam("Welcome back!")))
-
-	//marshalUserinfo := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty, info *oidc.UserInfo) {
-	//	data, err := json.Marshal(info)
-	//	if err != nil {
-	//		http.Error(w, err.Error(), http.StatusInternalServerError)
-	//		return
-	//	}
-	//	w.Write(data)
-	//}
-
-	marshalToken := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty) {
-		data, err := json.Marshal(tokens)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write(data)
-	}
-
-	// register the CodeExchangeHandler at the callbackPath
-	// the CodeExchangeHandler handles the auth response, creates the token request and calls the callback function
-	// with the returned tokens from the token endpoint
-	// in this example the callback function itself is wrapped by the UserinfoCallback which
-	// will call the Userinfo endpoint, check the sub and pass the info into the callback function
-	//http.Handle(c.CallbackPath, rp.CodeExchangeHandler(rp.UserinfoCallback(marshalUserinfo), provider))
-
-	// if you would use the callback without calling the userinfo endpoint, simply switch the callback handler for:
-	//
-	http.Handle(c.CallbackPath, rp.CodeExchangeHandler(marshalToken, provider))
-
-	lis := fmt.Sprintf("127.0.0.1:%s", c.CallbackPort)
-	logrus.Infof("listening on http://%s/", lis)
-	logrus.Info("press ctrl+c to stop")
-	logrus.Fatal(http.ListenAndServe(lis, nil))
-
-	//ready := make(chan string, 1)
-	//defer close(ready)
-	//cfg := oauth2cli.Config{
-	//	OAuth2Config:           *c.oAuth2Config,
-	//	LocalServerReadyChan:   ready,
-	//	LocalServerBindAddress: []string{"localhost:63275"},
-	//	Logf:                   c.Logf,
-	//}
-	//
-	//var token *oauth2.Token
-	//eg, ctx := errgroup.WithContext(ctx)
-	//eg.Go(func() error {
-	//	select {
-	//	case url := <-ready:
-	//		log.Printf("Open %s", url)
-	//		if err := browser.OpenURL(url); err != nil {
-	//			log.Printf("could not open browser: %v", err)
-	//		}
-	//		return nil
-	//	case <-ctx.Done():
-	//		return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
-	//	}
-	//})
-	//eg.Go(func() error {
-	//	token, err := oauth2cli.GetToken(ctx, cfg)
-	//	if err != nil {
-	//		return fmt.Errorf("could not get token: %w", err)
-	//	}
-	//	log.Printf("You got a valid token until %s", token.Expiry)
-	//	return nil
-	//})
-	//// if err := eg.Wait(); err != nil {
-	//// 	log.Fatalf("authorization error: %s", err)
-	//// }
-
-	return nil, nil
 }
 
 type SshConfigFactory interface {
@@ -405,8 +324,13 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
-	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
+	conf := getConfig(f.ZConfig)
+	conf.Credentials = edge_apis.NewJwtCredentials(token)
+	ctx, err := ziti.NewContext(conf)
+	if err != nil {
+		logrus.Fatalf("error creating ziti context: %v", err)
+	}
 
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
@@ -439,8 +363,8 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 	}
 }
 
-func getConfig(cfgFile string) (zitiCfg *config.Config) {
-	zitiCfg, err := config.NewFromFile(cfgFile)
+func getConfig(cfgFile string) (zitiCfg *ziti.Config) {
+	zitiCfg, err := ziti.NewConfigFromFile(cfgFile)
 	if err != nil {
 		log.Fatalf("failed to load ziti configuration file: %v", err)
 	}
