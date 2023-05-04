@@ -326,7 +326,8 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 
 func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
 	conf := getConfig(f.ZConfig)
-	conf.Credentials = edge_apis.NewJwtCredentials(token)
+	conf.Credentials = edge_apis.NewCredentials()
+	conf.Credentials.AddHeader("Authorization", "Bearer "+token)
 	ctx, err := ziti.NewContext(conf)
 	if err != nil {
 		logrus.Fatalf("error creating ziti context: %v", err)
