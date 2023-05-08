@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
-	edge_apis "github.com/openziti/sdk-golang/edge-apis"
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
@@ -326,9 +325,8 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 
 func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
 	conf := getConfig(f.ZConfig)
-	conf.Credentials = edge_apis.NewCredentials()
-	conf.Credentials.AddHeader("Authorization", "Bearer "+token)
 	ctx, err := ziti.NewContext(conf)
+	conf.Credentials.AddHeader("Authorization", "Bearer "+token)
 	if err != nil {
 		logrus.Fatalf("error creating ziti context: %v", err)
 	}
