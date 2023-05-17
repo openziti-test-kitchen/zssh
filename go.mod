@@ -7,11 +7,11 @@ require (
 	github.com/gorilla/securecookie v1.1.1
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/natefinch/npipe v0.0.0-20160621034901-c1b8fa8bdcce
-	github.com/openziti/sdk-golang v0.20.20
-	github.com/openziti/ziti v0.0.0-support-sdk-refactor
+	github.com/openziti/sdk-golang v0.20.23
+	github.com/openziti/ziti v0.0.0-20230515185602-fb6d15ab9b19
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.5
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
 	github.com/zitadel/oidc/v2 v2.5.0
@@ -56,13 +56,13 @@ require (
 	github.com/muhlemmer/gu v0.3.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
-	github.com/openziti/channel/v2 v2.0.64 // indirect
-	github.com/openziti/edge-api v0.25.18 // indirect
+	github.com/openziti/channel/v2 v2.0.65 // indirect
+	github.com/openziti/edge-api v0.25.19 // indirect
 	github.com/openziti/foundation/v2 v2.0.22 // indirect
-	github.com/openziti/identity v1.0.48 // indirect
+	github.com/openziti/identity v1.0.49 // indirect
 	github.com/openziti/metrics v1.2.21 // indirect
 	github.com/openziti/secretstream v0.1.7 // indirect
-	github.com/openziti/transport/v2 v2.0.77 // indirect
+	github.com/openziti/transport/v2 v2.0.78 // indirect
 	github.com/orcaman/concurrent-map/v2 v2.0.1 // indirect
 	github.com/parallaxsecond/parsec-client-go v0.0.0-20221025095442-f0a77d263cf9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -79,7 +79,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352 // indirect
 	go.opentelemetry.io/otel v1.15.1 // indirect
 	go.opentelemetry.io/otel/trace v1.15.1 // indirect
-	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
+	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
@@ -91,5 +91,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/openziti/ziti => ../ziti
