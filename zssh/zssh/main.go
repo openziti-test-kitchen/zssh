@@ -17,18 +17,24 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"golang.org/x/oauth2"
+	"os"
+	"zssh/zsshlib"
+
 	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"zssh/zsshlib"
 )
 
 const ExpectedServiceAndExeName = "zssh"
 
-var flags = zsshlib.SshFlags{}
+var (
+	callbackPath = "/auth/callback"
+	flags        = zsshlib.SshFlags{}
+)
 
 var rootCmd = &cobra.Command{
 	Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", flags.ServiceName),
@@ -37,10 +43,17 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username, targetIdentity := flags.GetUserAndIdentity(args[0])
-
-		sshConn := zsshlib.EstablishClient(flags, username, targetIdentity)
+		token := ""
+		var err error
+		if flags.OIDCMode {
+			token, err = OIDCFlow()
+			if err != nil {
+				logrus.Fatalf("error performing OIDC flow: %v", err)
+			}
+		}
+		sshConn := zsshlib.EstablishClient(flags, username, targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
-		err := zsshlib.RemoteShell(sshConn)
+		err = zsshlib.RemoteShell(sshConn)
 		if err != nil {
 			logrus.Fatalf("error opening remote shell: %v", err)
 		}
@@ -49,11 +62,62 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
+}
+
+// AuthCmd holds the required data for the init cmd
+type AuthCmd struct {
+	common.OptionsProvider
+}
+
+func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
+	cmd := &AuthCmd{OptionsProvider: p}
+
+	authCmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Test authenticate account with IdP to get OIDC ID token",
+		Long:  `Test authentication against IdP to get OIDC ID token.`,
+		Args:  cobra.NoArgs,
+		RunE:  cmd.Run,
+	}
+	flags.OIDCFlags(authCmd, ExpectedServiceAndExeName)
+	return authCmd
+}
+
+func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
+	_, err := OIDCFlow()
+	return err
+}
+
+func OIDCFlow() (string, error) {
+	cfg := &zsshlib.Config{
+		Config: oauth2.Config{
+			ClientID:     flags.ClientID,
+			ClientSecret: flags.ClientSecret,
+			RedirectURL:  fmt.Sprintf("http://localhost:%v%v", flags.CallbackPort, callbackPath),
+		},
+		CallbackPath: callbackPath,
+		CallbackPort: flags.CallbackPort,
+		Issuer:       flags.OIDCIssuer,
+		Logf:         logrus.Debugf,
+	}
+
+	ctx := context.Background()
+	token, err := zsshlib.GetToken(ctx, cfg)
+	if err != nil {
+		return "", err
+	}
+
+	logrus.Debugf("ID token: %s", token)
+	logrus.Infof("OIDC auth flow succeeded")
+
+	return token, nil
 }
 
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)

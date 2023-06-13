@@ -17,11 +17,12 @@
 package zsshlib
 
 import (
+	"context"
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
-	"github.com/pkg/errors"
-	"github.com/pkg/sftp"
+	"github.com/google/uuid"
+	"github.com/gorilla/securecookie"
+	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
+	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,7 +30,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/openziti/sdk-golang/ziti"
+	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
+	"github.com/zitadel/oidc/v2/pkg/client/rp"
+	httphelper "github.com/zitadel/oidc/v2/pkg/http"
+	"golang.org/x/oauth2"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -39,6 +49,14 @@ import (
 const (
 	ID_RSA  = "id_rsa"
 	SSH_DIR = ".ssh"
+)
+
+var (
+	// OktaAuthScope is the Okta authorization scope(s).
+	OktaAuthScope = "openid profile"
+	//OktaAuthScope = "okta.users.read.self openid profile"
+
+	ErrTokenIsNil = errors.New("ID token is nil")
 )
 
 func RemoteShell(client *ssh.Client) error {
@@ -88,6 +106,84 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// Config represents a config for the OIDC auth flow.
+type Config struct {
+	// CallbackPath is the path of the callback handler.
+	CallbackPath string
+
+	// CallbackPort is the port of the callback handler.
+	CallbackPort string
+
+	// Issuer is the URL of the OpenID Connect provider.
+	Issuer string
+
+	// HashKey is used to authenticate values using HMAC.
+	HashKey []byte
+
+	// BlockKey is used to encrypt values using AES.
+	BlockKey []byte
+
+	// IDToken is the ID token returned by the OIDC provider.
+	IDToken string
+
+	// Logger function for debug.
+	Logf func(format string, args ...interface{})
+
+	oauth2.Config
+}
+
+// GetToken starts a local HTTP server, opens the web browser to initiate the OIDC Discovery and
+// Token Exchange flow, blocks until the user completes authentication and is redirected back, and returns
+// the OIDC tokens.
+func GetToken(ctx context.Context, config *Config) (string, error) {
+	if err := config.validateAndSetDefaults(); err != nil {
+		return "", fmt.Errorf("invalid config: %w", err)
+	}
+
+	cookieHandler := httphelper.NewCookieHandler(config.HashKey, config.BlockKey, httphelper.WithUnsecure())
+
+	options := []rp.Option{
+		rp.WithCookieHandler(cookieHandler),
+		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
+	}
+	if config.ClientSecret == "" {
+		options = append(options, rp.WithPKCE(cookieHandler))
+	}
+
+	relyingParty, err := rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
+	if err != nil {
+		logrus.Fatalf("error creating relyingParty %s", err.Error())
+	}
+
+	//ctx := context.Background()
+	state := func() string {
+		return uuid.New().String()
+	}
+
+	tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
+
+	return tokens.IDToken, nil
+	//return "", nil
+}
+
+// validateAndSetDefaults validates the config and sets default values.
+func (c *Config) validateAndSetDefaults() error {
+	if c.ClientID == "" {
+		return fmt.Errorf("ClientID must be set")
+	}
+
+	c.HashKey = securecookie.GenerateRandomKey(32)
+	c.BlockKey = securecookie.GenerateRandomKey(32)
+
+	if c.Logf == nil {
+		c.Logf = func(string, ...interface{}) {}
+	}
+
+	c.Scopes = strings.Split(OktaAuthScope, " ")
+
+	return nil
 }
 
 type SshConfigFactory interface {
@@ -227,8 +323,14 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
-	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
+	conf := getConfig(f.ZConfig)
+	ctx, err := ziti.NewContext(conf)
+	conf.Credentials.AddJWT(token)
+	if err != nil {
+		logrus.Fatalf("error creating ziti context: %v", err)
+	}
+
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
@@ -260,8 +362,8 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 	}
 }
 
-func getConfig(cfgFile string) (zitiCfg *config.Config) {
-	zitiCfg, err := config.NewFromFile(cfgFile)
+func getConfig(cfgFile string) (zitiCfg *ziti.Config) {
+	zitiCfg, err := ziti.NewConfigFromFile(cfgFile)
 	if err != nil {
 		log.Fatalf("failed to load ziti configuration file: %v", err)
 	}
