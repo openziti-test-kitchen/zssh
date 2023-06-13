@@ -326,7 +326,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
 	conf := getConfig(f.ZConfig)
 	ctx, err := ziti.NewContext(conf)
-	conf.Credentials.AddHeader("Authorization", "Bearer "+token)
+	conf.Credentials.AddJWT(token)
 	if err != nil {
 		logrus.Fatalf("error creating ziti context: %v", err)
 	}
