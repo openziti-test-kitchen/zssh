@@ -19,7 +19,6 @@ package zsshlib
 import (
 	"fmt"
 	"github.com/openziti/sdk-golang/ziti"
-	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"io"
@@ -228,7 +227,10 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 }
 
 func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
-	ctx := ziti.NewContextWithConfig(getConfig(f.ZConfig))
+	ctx, err := ziti.NewContext(getConfig(f.ZConfig))
+	if err != nil {
+		logrus.Fatalf("could not load config from: %s", f.ZConfig)
+	}
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
@@ -260,8 +262,8 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 	}
 }
 
-func getConfig(cfgFile string) (zitiCfg *config.Config) {
-	zitiCfg, err := config.NewFromFile(cfgFile)
+func getConfig(cfgFile string) (zitiCfg *ziti.Config) {
+	zitiCfg, err := ziti.NewConfigFromFile(cfgFile)
 	if err != nil {
 		log.Fatalf("failed to load ziti configuration file: %v", err)
 	}
