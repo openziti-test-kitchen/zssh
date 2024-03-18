@@ -4,8 +4,8 @@ Ziti SSH is a project to replace `ssh` and `scp` with a more secure, zero-trust 
 These programs are not as feature rich as the ones provided by your operating system at this time but we're looking for feedback. It's our assertion that these tools will cover 80% (or more) of your needs. If you find you are missing a favorite feature - please open an issue! We'd love to hear your feedback
 
 Read about:
-* zssh - https://docs.openziti.io/blog/zitification/zitifying-ssh/
-* zscp - https://docs.openziti.io/blog/zitification/zitifying-scp/
+* zssh - [https://docs.openziti.io/blog/zitification/zitifying-ssh/](https://blog.openziti.io/zitifying-ssh)
+* zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
 
 ## zssh usage
 ```
