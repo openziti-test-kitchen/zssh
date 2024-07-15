@@ -45,7 +45,7 @@ var rootCmd = &cobra.Command{
 		username, targetIdentity := flags.GetUserAndIdentity(args[0])
 		token := ""
 		var err error
-		if flags.OIDCMode {
+		if flags.OIDC.Mode {
 			token, err = OIDCFlow()
 			if err != nil {
 				logrus.Fatalf("error performing OIDC flow: %v", err)
@@ -92,13 +92,13 @@ func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
 func OIDCFlow() (string, error) {
 	cfg := &zsshlib.Config{
 		Config: oauth2.Config{
-			ClientID:     flags.ClientID,
-			ClientSecret: flags.ClientSecret,
-			RedirectURL:  fmt.Sprintf("http://localhost:%v%v", flags.CallbackPort, callbackPath),
+			ClientID:     flags.OIDC.ClientID,
+			ClientSecret: flags.OIDC.ClientSecret,
+			RedirectURL:  fmt.Sprintf("http://localhost:%v%v", flags.OIDC.CallbackPort, callbackPath),
 		},
 		CallbackPath: callbackPath,
-		CallbackPort: flags.CallbackPort,
-		Issuer:       flags.OIDCIssuer,
+		CallbackPort: flags.OIDC.CallbackPort,
+		Issuer:       flags.OIDC.Issuer,
 		Logf:         logrus.Debugf,
 	}
 

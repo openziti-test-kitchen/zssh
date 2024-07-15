@@ -25,7 +25,6 @@ import (
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -324,26 +323,47 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 }
 
 func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
-	conf := getConfig(f.ZConfig)
-	ctx, err := ziti.NewContext(conf)
-	conf.Credentials.AddJWT(token)
+	//credentials := edge_apis.NewJwtCredentials(token)
+	cfg, err := getConfig(f.ZConfig)
 	if err != nil {
-		logrus.Fatalf("error creating ziti context: %v", err)
+		logrus.Errorf("config file not found. using defaults")
+		/*
+			cfg = &ziti.Config{
+				ZtAPI:       "https://ec2-3-134-108-218.us-east-2.compute.amazonaws.com:8441/edge/client/v1",
+				Credentials: credentials,
+			}
+		*/
+	}
+	/*
+		caPool, caErr := ziti.GetControllerWellKnownCaPool("https://ec2-3-134-108-218.us-east-2.compute.amazonaws.com:8441")
+		if caErr != nil {
+			panic(caErr)
+		}
+		credentials.CaPool = caPool
+	*/
+	cfg.ConfigTypes = append(cfg.ConfigTypes, "all")
+	ctx, err := ziti.NewContext(cfg)
+
+	if err = ctx.Authenticate(); err != nil {
+		panic(err)
 	}
 
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
 	}
+
 	dialOptions := &ziti.DialOptions{
 		ConnectTimeout: 0,
 		Identity:       targetIdentity,
 		AppData:        nil,
 	}
 	svc, err := ctx.DialWithOptions(f.ServiceName, dialOptions)
+
 	if err != nil {
 		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
 	}
+
 	factory := NewSshConfigFactoryImpl(userName, f.SshKeyPath)
 	config := factory.Config()
 	sshConn, err := Dial(config, svc)
@@ -359,12 +379,16 @@ func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
 	}
 }
 
-func getConfig(cfgFile string) (zitiCfg *ziti.Config) {
+func getConfig(cfgFile string) (*ziti.Config, error) {
+	if _, err := os.Stat(cfgFile); err != nil {
+		// create default
+		return nil, nil
+	}
 	zitiCfg, err := ziti.NewConfigFromFile(cfgFile)
 	if err != nil {
-		log.Fatalf("failed to load ziti configuration file: %v", err)
+		return nil, errors.New(fmt.Sprintf("failed to load ziti configuration file: %v", cfgFile))
 	}
-	return zitiCfg
+	return zitiCfg, nil
 }
 
 // AppendBaseName tags file name on back of remotePath if the path is blank or a directory/*

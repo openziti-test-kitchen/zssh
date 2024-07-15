@@ -28,6 +28,10 @@ type OIDCFlags struct {
 	CallbackPort string
 }
 
+type Creds struct {
+	IdentityFile string
+}
+
 type ScpFlags struct {
 	SshFlags
 	Recursive bool
@@ -88,7 +92,7 @@ func MarkOidcagsRequired(cmd *cobra.Command) {
 // TODO: Add config file support
 func (f *SshFlags) OIDCFlags(cmd *cobra.Command, exeName string) {
 	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "CallbackPort", "p", "63275", "Port for Callback. default: 63275")
-	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "cid1", "IdP ClientID. default: cid1")
+	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "cid1", "IdP ClientID. default: 12345678")
 	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "ClientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
 	cmd.Flags().StringVarP(&f.OIDC.Issuer, "OIDCIssuer", "a", "https://dev-yourid.okta.com", "URL of the OpenID Connect provider. required")
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, "toggle OIDC mode. default: false")
