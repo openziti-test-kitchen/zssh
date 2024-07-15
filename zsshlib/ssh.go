@@ -331,6 +331,11 @@ func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Cl
 		logrus.Fatalf("error creating ziti context: %v", err)
 	}
 
+	if err = ctx.Authenticate(); err != nil {
+		logrus.Errorf("error creating ziti context: %v", err)
+		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
+	}
+
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
