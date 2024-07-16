@@ -1,7 +1,9 @@
 # zssh
 Ziti SSH is a project to replace `ssh` and `scp` with a more secure, zero-trust implementation of `ssh` and `scp`.
 
-These programs are not as feature rich as the ones provided by your operating system at this time but we're looking for feedback. It's our assertion that these tools will cover 80% (or more) of your needs. If you find you are missing a favorite feature - please open an issue! We'd love to hear your feedback
+These programs are not as feature rich as the ones provided by your operating system at this time, but we're looking 
+for feedback. It's our assertion that these tools will cover 80% (or more) of your needs. If you find you are missing 
+a favorite feature - please open an issue! We'd love to hear your feedback
 
 Read about:
 * zssh - https://docs.openziti.io/blog/zitification/zitifying-ssh/
@@ -14,11 +16,16 @@ Usage:
    <remoteUsername>@<targetIdentity> [flags]
 
 Flags:
-  -i, --SshKeyPath string   Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string      Path to ziti config file. default: $HOME/.ziti/zssh.json
-  -d, --debug               pass to enable additional debug information
-  -h, --help                help for this command
-  -s, --service string      service name. default: zssh (default "zssh")
+  -p, --CallbackPort string   Port for Callback. default: 63275 (default "63275")
+  -n, --ClientID string       IdP ClientID. default: cid1 (default "cid1")
+  -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
+  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required (default "https://dev-yourid.okta.com")
+  -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
+  -c, --ZConfig string        Path to ziti config file. default: $HOME/.ziti/zssh.json
+  -d, --debug                 pass to enable additional debug information
+  -h, --help                  help for this command
+  -o, --oidc                  toggle OIDC mode. default: false
+  -s, --service string        service name. default: zssh (default "zssh")
 ```
 
 ## zscp usage
@@ -28,12 +35,17 @@ Usage:
 Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path] [flags]
 
 Flags:
-  -i, --SshKeyPath string   Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string      Path to ziti config file. default: $HOME/.ziti/zssh.json
-  -d, --debug               pass to enable additional debug information
-  -h, --help                help for Remote
-  -r, --recursive           pass to enable recursive file transfer
-  -s, --service string      service name. default: zssh (default "zssh")
+  -p, --CallbackPort string   Port for Callback. default: 63275 (default "63275")
+  -n, --ClientID string       IdP ClientID. default: cid1 (default "cid1")
+  -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
+  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required (default "https://dev-yourid.okta.com")
+  -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
+  -c, --ZConfig string        Path to ziti config file. default: $HOME/.ziti/zssh.json
+  -d, --debug                 pass to enable additional debug information
+  -h, --help                  help for Remote
+  -o, --oidc                  toggle OIDC mode. default: false
+  -r, --recursive             pass to enable recursive file transfer
+  -s, --service string        service name. default: zssh (default "zssh")
 ```
 
 ## zssh/zscp Quickstart
@@ -49,8 +61,8 @@ the_port=22
 
 # create two identities. one host - one client. Only necessary if you want/need them. Skippable if you
 # already have an identity. provided here to just 'make it easy' to test/try
-ziti edge create identity device "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
-ziti edge create identity device "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
+ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
+ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
 
 # if you want to modify anything, often deleting the configs/services is easier than updating them
 # it's easier to delete all the items too - so until you understand exactly how ziti works,
@@ -60,7 +72,10 @@ ziti edge delete config "${service_name}.intercept.v1"
 ziti edge delete service "${service_name}"
 ziti edge delete service-policy "${service_name}-binding"
 ziti edge delete service-policy "${service_name}-dialing"
+```
 
+If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
+```
 ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
 # intercept is not needed for zscp/zssh but make it for testing if you like
 ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
@@ -69,10 +84,66 @@ ziti edge create service-policy "${service_name}-binding" Bind --service-roles "
 ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers"
 ```
 
-If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
+
+
+## OIDC for Secondary Auth
+
+You can now use OIDC for secondary auth. The readme is not full and complete but the necessary items/config are:
+* keycloak (or other OIDC server)
+* know the audience your OIDC provider will inject in your JWTs and assign it to the 'aud' variable
+* know the claim you plan to use that will be in the JWT returned from the OIDC provider
+* create an identity in OpenZiti with an external-id matching the claim from above
+
 ```
-ziti edge delete service-policy where 'name contains "'${service_name}'"'
-ziti edge delete service where 'name contains "'${service_name}'"'
-ziti edge delete config where 'name contains "'${service_name}'"'
-ziti edge delete identity where 'name contains "'${service_name}'"'
+ext_signer_name="keycloak-ext-jwt-signer"
+iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
+jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
+aud="cid1"
+claim="email"
+auth_policy_name="keycloak_auth_policy"
+
+ziti edge update identity zsshSvcClient -P "default"
+ziti edge delete auth-policy keycloak_auth_policy
+ziti edge delete ext-jwt-signer "${ext_signer_name}"
+
+ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
+
+keycloak_auth_policy=$(ziti edge create auth-policy "${auth_policy_name}" \
+    --primary-cert-allowed \
+    --primary-cert-expired-allowed \
+    --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
+
+ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
+ziti edge update identity zsshSvcClient --external-id clint.dovholuk@netfoundry.io
+```
+
+
+
+
+
+## Examples
+
+ssh example:
+```
+./build/zssh \
+    -i /home/cd/.ssh/nf/dovholuknfaws.pem \
+    -s zsshSvc \
+    -o \
+    -a https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm \
+    -n cid1 \
+    -c /home/cd/git/github/openziti-test-kitchen/zssh/zsshSvcClient.json \
+    ubuntu@zsshSvcServer
+```
+
+scp example:
+```
+./build/zscp \
+    -i /home/cd/.ssh/nf/dovholuknfaws.pem \
+    -s zsshSvc \
+    -o \
+    -a https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm \
+    -n cid1 \
+    -c /home/cd/git/github/openziti-test-kitchen/zssh/zsshSvcClient.json \
+    SECURITY.md \
+    ubuntu@zsshSvcServer:.
 ```
