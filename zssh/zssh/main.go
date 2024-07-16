@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"golang.org/x/oauth2"
 	"os"
+	"time"
 	"zssh/zsshlib"
 
 	"github.com/openziti/ziti/common/enrollment"
@@ -101,8 +102,11 @@ func OIDCFlow() (string, error) {
 		Issuer:       flags.OIDC.Issuer,
 		Logf:         logrus.Debugf,
 	}
+	waitFor := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), waitFor)
+	defer cancel() // Ensure the cancel function is called to release resources
 
-	ctx := context.Background()
+	logrus.Infof("OIDC requested. If the CLI appears to be hung, check your browser for a login prompt. Waiting up to %v", waitFor)
 	token, err := zsshlib.GetToken(ctx, cfg)
 	if err != nil {
 		return "", err

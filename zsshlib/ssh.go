@@ -162,10 +162,19 @@ func GetToken(ctx context.Context, config *Config) (string, error) {
 		return uuid.New().String()
 	}
 
-	tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
+	resultChan := make(chan *oidc.Tokens[*oidc.IDTokenClaims])
 
-	return tokens.IDToken, nil
-	//return "", nil
+	go func() {
+		tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
+		resultChan <- tokens
+	}()
+
+	select {
+	case tokens := <-resultChan:
+		return tokens.IDToken, nil
+	case <-ctx.Done():
+		return "", errors.New("Timeout: OIDC authentication took too long")
+	}
 }
 
 // validateAndSetDefaults validates the config and sets default values.
