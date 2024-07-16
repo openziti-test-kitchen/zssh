@@ -184,6 +184,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 
