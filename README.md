@@ -52,17 +52,74 @@ Flags:
 
 Here's a quick set of steps you can run to make two test identities, the configs, service and policies to enable zssh/zscp
 
+#### Establish Some Variables To Use With Sample Commands
 ```
 # establish some variables which are used below
 service_name=zsshSvc
 client_identity="${service_name}Client"
 server_identity="${service_name}Server"
 the_port=22
+```
 
-# create two identities. one host - one client. Only necessary if you want/need them. Skippable if you
-# already have an identity. provided here to just 'make it easy' to test/try
+#### Create Configs, Service, and Serivce Policies
+```
+ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
+# intercept is not needed for zscp/zssh but make it for testing if you like
+ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
+ziti edge create service "${service_name}" --configs "${service_name}.intercept.v1","${service_name}.host.v1"
+ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders"
+ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers"
+
+# create two identities. one host - one client. Only necessary if you want/need them. Skippable if you have identities already
 ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
 ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
+
+ziti edge enroll "${server_identity}.jwt"
+ziti edge enroll "${client_identity}.jwt"
+```
+
+#### IF Using OIDC for Secondary Auth
+
+You can now use OIDC for secondary auth. This example will use Keycloak federated to GitHub and Google
+* keycloak (or other OIDC server)
+* know the audience your OIDC provider will inject in your JWTs and assign it to the 'aud' variable. For KeyCloak it 
+  will be whatever the client is you make
+* know the claim you plan to use that will be in the JWT returned from the OIDC provider, generally it'll be email 
+  but it's not mandatory to use email
+* create an identity in OpenZiti with an external-id matching the claim from above
+
+```
+ext_signer_name="keycloak-ext-jwt-signer"
+iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
+jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
+aud="cid1"
+claim="email"
+auth_policy_name="keycloak_auth_policy"
+YOUR_EMAIL_ADDRESS=
+
+ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
+echo "External JWT signer created with id: $ext_jwt_signer_id"
+
+keycloak_auth_policy=$(ziti edge create auth-policy "${auth_policy_name}" \
+    --primary-cert-allowed \
+    --primary-cert-expired-allowed \
+    --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
+echo "keycloak_auth_policy created with id: "
+
+ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
+ziti edge update identity zsshSvcClient --external-id $YOUR_EMAIL_ADDRESS
+```
+
+
+
+#### Clean Up and Start Again
+```
+# already have an identity. provided here to just 'make it easy' to test/try
+ziti edge delete identity zsshSvcServer
+ziti edge delete identity zsshSvcClient
+
+ziti edge delete auth-policy keycloak_auth_policy
+ziti edge delete ext-jwt-signer "${ext_signer_name}"
 
 # if you want to modify anything, often deleting the configs/services is easier than updating them
 # it's easier to delete all the items too - so until you understand exactly how ziti works,
@@ -75,47 +132,9 @@ ziti edge delete service-policy "${service_name}-dialing"
 ```
 
 If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
-```
-ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
-# intercept is not needed for zscp/zssh but make it for testing if you like
-ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
-ziti edge create service "${service_name}" --configs "${service_name}.intercept.v1","${service_name}.host.v1"
-ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders"
-ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers"
-```
 
 
 
-## OIDC for Secondary Auth
-
-You can now use OIDC for secondary auth. The readme is not full and complete but the necessary items/config are:
-* keycloak (or other OIDC server)
-* know the audience your OIDC provider will inject in your JWTs and assign it to the 'aud' variable
-* know the claim you plan to use that will be in the JWT returned from the OIDC provider
-* create an identity in OpenZiti with an external-id matching the claim from above
-
-```
-ext_signer_name="keycloak-ext-jwt-signer"
-iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
-jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
-aud="cid1"
-claim="email"
-auth_policy_name="keycloak_auth_policy"
-
-ziti edge update identity zsshSvcClient -P "default"
-ziti edge delete auth-policy keycloak_auth_policy
-ziti edge delete ext-jwt-signer "${ext_signer_name}"
-
-ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
-
-keycloak_auth_policy=$(ziti edge create auth-policy "${auth_policy_name}" \
-    --primary-cert-allowed \
-    --primary-cert-expired-allowed \
-    --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
-
-ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
-ziti edge update identity zsshSvcClient --external-id clint.dovholuk@netfoundry.io
-```
 
 
 
