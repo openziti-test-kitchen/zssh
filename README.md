@@ -89,13 +89,13 @@ You can now use OIDC for secondary auth. This example will use Keycloak federate
 * create an identity in OpenZiti with an external-id matching the claim from above
 
 ```
+YOUR_EMAIL_ADDRESS=
 ext_signer_name="keycloak-ext-jwt-signer"
 iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
 jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
 aud="cid1"
 claim="email"
 auth_policy_name="keycloak_auth_policy"
-YOUR_EMAIL_ADDRESS=
 
 ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
 echo "External JWT signer created with id: $ext_jwt_signer_id"
@@ -104,7 +104,7 @@ keycloak_auth_policy=$(ziti edge create auth-policy "${auth_policy_name}" \
     --primary-cert-allowed \
     --primary-cert-expired-allowed \
     --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
-echo "keycloak_auth_policy created with id: "
+echo "keycloak_auth_policy created with id: ${keycloak_auth_policy}"
 
 ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
 ziti edge update identity zsshSvcClient --external-id $YOUR_EMAIL_ADDRESS
