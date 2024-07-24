@@ -19,9 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"golang.org/x/oauth2"
 	"os"
-	"time"
 	"zssh/zsshlib"
 
 	"github.com/openziti/ziti/common/enrollment"
@@ -33,8 +31,8 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	callbackPath = "/auth/callback"
-	flags        = zsshlib.SshFlags{}
+	callbackPatha = "/auth/callback"
+	flags         = zsshlib.SshFlags{}
 )
 
 var rootCmd = &cobra.Command{
@@ -47,7 +45,7 @@ var rootCmd = &cobra.Command{
 		token := ""
 		var err error
 		if flags.OIDC.Mode {
-			token, err = OIDCFlow()
+			token, err = zsshlib.OIDCFlow(context.Background(), flags)
 			if err != nil {
 				logrus.Fatalf("error performing OIDC flow: %v", err)
 			}
@@ -86,36 +84,8 @@ func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
 }
 
 func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
-	_, err := OIDCFlow()
-	return err
-}
-
-func OIDCFlow() (string, error) {
-	cfg := &zsshlib.Config{
-		Config: oauth2.Config{
-			ClientID:     flags.OIDC.ClientID,
-			ClientSecret: flags.OIDC.ClientSecret,
-			RedirectURL:  fmt.Sprintf("http://localhost:%v%v", flags.OIDC.CallbackPort, callbackPath),
-		},
-		CallbackPath: callbackPath,
-		CallbackPort: flags.OIDC.CallbackPort,
-		Issuer:       flags.OIDC.Issuer,
-		Logf:         logrus.Debugf,
-	}
-	waitFor := 30 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), waitFor)
-	defer cancel() // Ensure the cancel function is called to release resources
-
-	logrus.Infof("OIDC requested. If the CLI appears to be hung, check your browser for a login prompt. Waiting up to %v", waitFor)
-	token, err := zsshlib.GetToken(ctx, cfg)
-	if err != nil {
-		return "", err
-	}
-
-	logrus.Debugf("ID token: %s", token)
-	logrus.Infof("OIDC auth flow succeeded")
-
-	return token, nil
+	//_, err := zsshlib.OIDCFlow()
+	return nil // err
 }
 
 func main() {

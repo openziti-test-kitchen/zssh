@@ -127,8 +127,8 @@ ziti edge delete ext-jwt-signer "${ext_signer_name}"
 ziti edge delete config "${service_name}.host.v1"
 ziti edge delete config "${service_name}.intercept.v1"
 ziti edge delete service "${service_name}"
-ziti edge delete service-policy "${service_name}-binding"
-ziti edge delete service-policy "${service_name}-dialing"
+ziti edge delete service-policy "${service_name}-binding" --semantic "AnyOf"
+ziti edge delete service-policy "${service_name}-dialing" --semantic "AnyOf"
 ```
 
 If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:

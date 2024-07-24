@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
@@ -43,10 +44,15 @@ var rootCmd = &cobra.Command{
 		var remoteFilePath string
 		var localFilePaths []string
 		var isCopyToRemote bool
-		var err error
 
-		// token is the ID token from the OIDC flow
-		token := "" // TODO: implement OIDC flow
+		token := ""
+		var err error
+		if flags.OIDC.Mode {
+			token, err = zsshlib.OIDCFlow(context.Background(), flags.SshFlags)
+			if err != nil {
+				logrus.Fatalf("error performing OIDC flow: %v", err)
+			}
+		}
 
 		if strings.ContainsAny(args[0], ":") {
 			remoteFilePath = args[0]
