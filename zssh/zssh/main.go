@@ -31,17 +31,23 @@ import (
 const ExpectedServiceAndExeName = "zssh"
 
 var (
-	callbackPatha = "/auth/callback"
-	flags         = zsshlib.SshFlags{}
+	flags = zsshlib.SshFlags{}
 )
 
 var rootCmd = &cobra.Command{
 	Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", flags.ServiceName),
 	Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-	Args:  cobra.ExactValidArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			fmt.Println("You need to specify at least one positional argument")
+			os.Exit(1)
+		}
+
 		username, targetIdentity := flags.GetUserAndIdentity(args[0])
+
+		cmdArgs := args[1:]
 		token := ""
 		var err error
 		if flags.OIDC.Mode {
@@ -52,7 +58,7 @@ var rootCmd = &cobra.Command{
 		}
 		sshConn := zsshlib.EstablishClient(flags, username, targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
-		err = zsshlib.RemoteShell(sshConn)
+		err = zsshlib.RemoteShell(sshConn, cmdArgs)
 		if err != nil {
 			logrus.Fatalf("error opening remote shell: %v", err)
 		}
@@ -74,7 +80,7 @@ func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
 
 	authCmd := &cobra.Command{
 		Use:   "auth",
-		Short: "Test authenticate account with IdP to get OIDC ID token",
+		Short: "Test OIDC auth flow",
 		Long:  `Test authentication against IdP to get OIDC ID token.`,
 		Args:  cobra.NoArgs,
 		RunE:  cmd.Run,
@@ -83,15 +89,15 @@ func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
 	return authCmd
 }
 
-func (cmd *AuthCmd) Run(cobraCmd *cobra.Command, args []string) error {
-	//_, err := zsshlib.OIDCFlow()
-	return nil // err
+func (cmd *AuthCmd) Run(_ *cobra.Command, _ []string) error {
+	_, err := zsshlib.OIDCFlow(context.Background(), flags)
+	return err
 }
 
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
-	rootCmd.AddCommand(NewAuthCmd(p))
+	// leave out for now // rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)

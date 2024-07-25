@@ -24,7 +24,6 @@ import (
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -59,10 +58,43 @@ var (
 	ErrTokenIsNil = errors.New("ID token is nil")
 )
 
-func RemoteShell(client *ssh.Client) error {
+func RemoteShell(client *ssh.Client, args []string) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
+	}
+
+	if err := session.RequestPty("xterm", 80, 40, ssh.TerminalModes{}); err != nil {
+		logrus.Fatalf("Failed to request pseudo terminal: %v", err)
+	}
+
+	if len(args) > 0 {
+		defer func() { _ = session.Close() }()
+
+		stdoutPipe, err := session.StdoutPipe()
+		if err != nil {
+			logrus.Fatal(os.Stderr, "Failed to create stdout pipe:", err)
+		}
+
+		stderrPipe, err := session.StderrPipe()
+		if err != nil {
+			logrus.Fatal("Failed to create stderr pipe:", err)
+		}
+
+		cmd := strings.Join(args, " ")
+		logrus.Infof("executing remote command: %v", cmd)
+		if err := session.Start(cmd); err != nil {
+			logrus.Fatal("Failed to start command:", err)
+		}
+
+		processOutput(stdoutPipe, stderrPipe)
+
+		// Wait for the command to finish
+		if err := session.Wait(); err != nil {
+			logrus.Fatal("Command execution failed:", err)
+		}
+
+		return nil
 	}
 
 	stdInFd := int(os.Stdin.Fd())
@@ -86,8 +118,6 @@ func RemoteShell(client *ssh.Client) error {
 		logrus.Fatal(err)
 	}
 
-	fmt.Println("connected.")
-
 	if err := session.RequestPty("xterm", termHeight, termWidth, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
 		return err
 	}
@@ -96,7 +126,10 @@ func RemoteShell(client *ssh.Client) error {
 	if err != nil {
 		return err
 	}
-	session.Wait()
+	err = session.Wait()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -269,7 +302,7 @@ func (factory *SshConfigFactoryImpl) Config() *ssh.ClientConfig {
 }
 
 func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
-	content, err := ioutil.ReadFile(keyPath)
+	content, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read zssh file [%s]: %w", keyPath, err)
 	}
@@ -288,7 +321,7 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 }
 
 func SendFile(client *sftp.Client, localPath string, remotePath string) error {
-	localFile, err := ioutil.ReadFile(localPath)
+	localFile, err := os.ReadFile(localPath)
 
 	if err != nil {
 		return errors.Wrapf(err, "unable to read local file %v", localFile)
@@ -299,7 +332,7 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	if err != nil {
 		return errors.Wrapf(err, "unable to open remote file %v", remotePath)
 	}
-	defer rmtFile.Close()
+	defer func() { _ = rmtFile.Close() }()
 
 	_, err = rmtFile.Write(localFile)
 	if err != nil {
@@ -395,4 +428,29 @@ func AppendBaseName(c *sftp.Client, remotePath string, localPath string, debug b
 		}
 	}
 	return remotePath
+}
+
+// processOutput processes the stdout and stderr streams concurrently
+func processOutput(stdout io.Reader, stderr io.Reader) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine to process stdout
+	go func() {
+		defer wg.Done()
+		if _, err := io.Copy(os.Stdout, stdout); err != nil {
+			log.Fatalf("Error copying stdout: %v", err)
+		}
+	}()
+
+	// Goroutine to process stderr
+	go func() {
+		defer wg.Done()
+		if _, err := io.Copy(os.Stdout, stdout); err != nil {
+			log.Fatalf("Error copying stderr: %v", err)
+		}
+	}()
+
+	// Wait for both goroutines to finish
+	wg.Wait()
 }
