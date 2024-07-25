@@ -12,7 +12,7 @@ import (
 
 func OIDCFlow(initialContext context.Context, flags SshFlags) (string, error) {
 	callbackPath := "/auth/callback"
-	cfg := &Config{
+	cfg := &OIDCConfig{
 		Config: oauth2.Config{
 			ClientID:     flags.OIDC.ClientID,
 			ClientSecret: flags.OIDC.ClientSecret,

@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"zssh/config"
 	"zssh/zsshlib"
 )
 
@@ -81,10 +82,13 @@ var rootCmd = &cobra.Command{
 			flags.DebugLog("           local path: %s", localFilePaths[i])
 		}
 
-		username, targetIdentity := flags.GetUserAndIdentity(remoteFilePath)
+		targetIdentity := zsshlib.ParseTargetIdentity(remoteFilePath)
+		cfg := config.FindConfigByKey(targetIdentity)
+		zsshlib.Combine(cmd, &flags.SshFlags, cfg)
+
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, remoteFilePath, targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
 
 		client, err := sftp.NewClient(sshConn)
