@@ -1,9 +1,11 @@
 # zssh
-Ziti SSH is a project to replace `ssh` and `scp` with a more secure, zero-trust implementation of `ssh` and `scp`.
+Ziti SSH is a project to replace `ssh` and `scp` with a more secure, zero-trust implementation 
+of `ssh` and `scp`. 
 
-These programs are not as feature rich as the ones provided by your operating system at this time, but we're looking 
-for feedback. It's our assertion that these tools will cover 80% (or more) of your needs. If you find you are missing 
-a favorite feature - please open an issue! We'd love to hear your feedback
+These programs are not as feature rich as the ones provided by your operating system at this 
+time, but we're looking for feedback. It's our assertion that these tools will cover 80% (or more) 
+of your needs. If you find you are missing a favorite feature - please open an issue! We'd love to 
+hear your feedback.
 
 Read about:
 * zssh - https://docs.openziti.io/blog/zitification/zitifying-ssh/
@@ -133,36 +135,64 @@ ziti edge delete service-policy "${service_name}-dialing" --semantic "AnyOf"
 
 If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
 
-
-
-
-
-
-
-
 ## Examples
+
+variables established:
+```
+private_key=~/.ssh/id_rsa
+oidc_issuer=https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm
+identity_file=/home/cd/git/github/openziti-test-kitchen/zssh/zsshSvcClient.json
+```
 
 ssh example:
 ```
 ./build/zssh \
-    -i /home/cd/.ssh/nf/dovholuknfaws.pem \
+    -i ${private_key} \
     -s zsshSvc \
     -o \
-    -a https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm \
+    -a ${oidc_issuer} \
     -n cid1 \
-    -c /home/cd/git/github/openziti-test-kitchen/zssh/zsshSvcClient.json \
+    -c ${identity_file} \
     ubuntu@zsshSvcServer
+```
+
+remote command execution ssh example. NOTE the use of `--` to denote where the
+command starts and the `zssh` flags end is important! this command will list
+the contents of the remote connection with colorized results:
+```
+./build/zssh \
+    -i ${private_key} \
+    -s zsshSvc \
+    -o \
+    -a ${oidc_issuer} \
+    -n cid1 \
+    -c ${identity_file} \
+    ubuntu@zsshSvcServer \
+    -- ls -l --color=auto
 ```
 
 scp example:
 ```
 ./build/zscp \
-    -i /home/cd/.ssh/nf/dovholuknfaws.pem \
+    -i ${private_key} \
     -s zsshSvc \
     -o \
     -a https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm \
     -n cid1 \
-    -c /home/cd/git/github/openziti-test-kitchen/zssh/zsshSvcClient.json \
+    -c ${identity_file} \
     SECURITY.md \
     ubuntu@zsshSvcServer:.
+```
+
+ssh remote command to verify SECURITY.md was transferred:
+```
+./build/zssh \
+    -i ${private_key} \
+    -s zsshSvc \
+    -o \
+    -a ${oidc_issuer} \
+    -n cid1 \
+    -c ${identity_file} \
+    ubuntu@zsshSvcServer \
+    -- ls -l SECURITY.md
 ```
