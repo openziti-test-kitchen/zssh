@@ -60,11 +60,11 @@ func RemoteShell(client *ssh.Client, args []string) error {
 		return err
 	}
 
-	if err := session.RequestPty("xterm", 80, 40, ssh.TerminalModes{}); err != nil {
-		logrus.Fatalf("Failed to request pseudo terminal: %v", err)
-	}
-
 	if len(args) > 0 {
+		if err := session.RequestPty("xterm", 80, 40, ssh.TerminalModes{}); err != nil {
+			logrus.Fatalf("Failed to request pseudo terminal: %v", err)
+		}
+
 		defer func() { _ = session.Close() }()
 
 		stdoutPipe, err := session.StdoutPipe()
