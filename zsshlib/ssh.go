@@ -51,11 +51,7 @@ const (
 )
 
 var (
-	// OktaAuthScope is the Okta authorization scope(s).
-	OktaAuthScope = "openid profile"
-	//OktaAuthScope = "okta.users.read.self openid profile"
-
-	ErrTokenIsNil = errors.New("ID token is nil")
+	DefaultAuthScopes = "openid profile"
 )
 
 func RemoteShell(client *ssh.Client, args []string) error {
@@ -223,7 +219,7 @@ func (c *Config) validateAndSetDefaults() error {
 		c.Logf = func(string, ...interface{}) {}
 	}
 
-	c.Scopes = strings.Split(OktaAuthScope, " ")
+	c.Scopes = strings.Split(DefaultAuthScopes, " ")
 
 	return nil
 }
