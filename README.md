@@ -8,8 +8,8 @@ of your needs. If you find you are missing a favorite feature - please open an i
 hear your feedback.
 
 Read about:
-* zssh - https://docs.openziti.io/blog/zitification/zitifying-ssh/
-* zscp - https://docs.openziti.io/blog/zitification/zitifying-scp/
+* zssh - [https://docs.openziti.io/blog/zitification/zitifying-ssh/](https://blog.openziti.io/zitifying-ssh)
+* zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
 
 ## zssh usage
 ```
@@ -63,7 +63,7 @@ server_identity="${service_name}Server"
 the_port=22
 ```
 
-#### Create Configs, Service, and Serivce Policies
+#### Create Configs, Service, and Service Policies
 ```
 ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
 # intercept is not needed for zscp/zssh but make it for testing if you like
