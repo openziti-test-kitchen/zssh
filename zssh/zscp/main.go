@@ -46,10 +46,10 @@ var rootCmd = &cobra.Command{
 		var localFilePaths []string
 		var isCopyToRemote bool
 
-		token := ""
+		oidcToken := ""
 		var err error
 		if flags.OIDC.Mode {
-			token, err = zsshlib.OIDCFlow(context.Background(), flags.SshFlags)
+			oidcToken, err = zsshlib.OIDCFlow(context.Background(), &flags.SshFlags)
 			if err != nil {
 				logrus.Fatalf("error performing OIDC flow: %v", err)
 			}
@@ -88,7 +88,7 @@ var rootCmd = &cobra.Command{
 
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		sshConn := zsshlib.EstablishClient(flags.SshFlags, remoteFilePath, targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, remoteFilePath, targetIdentity, oidcToken)
 		defer func() { _ = sshConn.Close() }()
 
 		client, err := sftp.NewClient(sshConn)
@@ -194,7 +194,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
-	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 

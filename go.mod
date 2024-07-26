@@ -7,6 +7,7 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/natefinch/npipe v0.0.0-20160621034901-c1b8fa8bdcce
+	github.com/openziti/edge-api v0.26.21
 	github.com/openziti/sdk-golang v0.23.39
 	github.com/openziti/ziti v0.32.0-alpha-1
 	github.com/pkg/errors v0.9.1
@@ -17,6 +18,7 @@ require (
 	github.com/zitadel/oidc/v2 v2.12.0
 	golang.org/x/crypto v0.25.0
 	golang.org/x/oauth2 v0.21.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -61,7 +63,6 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/openziti/channel/v2 v2.0.136 // indirect
-	github.com/openziti/edge-api v0.26.21 // indirect
 	github.com/openziti/foundation/v2 v2.0.47 // indirect
 	github.com/openziti/identity v1.0.81 // indirect
 	github.com/openziti/metrics v1.2.56 // indirect

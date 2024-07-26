@@ -69,8 +69,8 @@ ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "a
 # intercept is not needed for zscp/zssh but make it for testing if you like
 ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
 ziti edge create service "${service_name}" --configs "${service_name}.intercept.v1","${service_name}.host.v1"
-ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders"
-ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers"
+ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders" --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers" --semantic "AnyOf"
 
 # create two identities. one host - one client. Only necessary if you want/need them. Skippable if you have identities already
 ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
@@ -129,8 +129,8 @@ ziti edge delete ext-jwt-signer "${ext_signer_name}"
 ziti edge delete config "${service_name}.host.v1"
 ziti edge delete config "${service_name}.intercept.v1"
 ziti edge delete service "${service_name}"
-ziti edge delete service-policy "${service_name}-binding" --semantic "AnyOf"
-ziti edge delete service-policy "${service_name}-dialing" --semantic "AnyOf"
+ziti edge delete service-policy "${service_name}-binding"
+ziti edge delete service-policy "${service_name}-dialing"
 ```
 
 If you no longer want these services and identities (i.e. you're cleaning up) run this or something like it:
@@ -196,3 +196,45 @@ ssh remote command to verify SECURITY.md was transferred:
     ubuntu@zsshSvcServer \
     -- ls -l SECURITY.md
 ```
+
+## Testing Locally
+#### window 1
+```
+ziti egde quickstart
+```
+
+#### window 2
+```
+ziti edge login localhost:1280 -u admin -p admin -y
+service_name=zsshTest
+client_identity="zsshClient"
+server_identity="zsshServer"
+the_port=22
+ziti edge create config "${service_name}.host.v1" host.v1 \
+'{"protocol":"tcp", "address":"localhost", "port":'"$the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
+ziti edge create service "${service_name}" --configs "${service_name}.host.v1"
+ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles ${service_name}.binders" --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles ${service_name}.dialers" --semantic "AnyOf"
+ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
+ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
+ziti edge enroll "${server_identity}.jwt"
+ziti edge enroll "${client_identity}.jwt"
+
+./ziti-edge-tunnel run-host -i ./zsshServer.json
+```
+
+#### window 3
+```
+git checkout add-config-support
+mkdir build
+go build -o build ./...
+./build/zssh -i ./zsshClient.json zsshServer
+```
+
+
+
+
+
+
+
+

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func OIDCFlow(initialContext context.Context, flags SshFlags) (string, error) {
+func OIDCFlow(initialContext context.Context, flags *SshFlags) (string, error) {
 	callbackPath := "/auth/callback"
 	cfg := &OIDCConfig{
 		Config: oauth2.Config{

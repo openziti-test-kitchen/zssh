@@ -17,10 +17,12 @@
 package zsshlib
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
+	"github.com/openziti/edge-api/rest_model"
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
@@ -361,19 +363,60 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, target, targetIdentity, token string) *ssh.Client {
+func EstablishClient(f SshFlags, target, targetIdentity, oidcToken string) *ssh.Client {
 	conf := getConfig(f.ZConfig)
 	ctx, err := ziti.NewContext(conf)
-	conf.Credentials.AddJWT(token)
+	conf.Credentials.AddJWT(oidcToken)
 	if err != nil {
 		logrus.Fatalf("error creating ziti context: %v", err)
 	}
 
+	ctx.Events().AddMfaTotpCodeListener(func(c ziti.Context, detail *rest_model.AuthQueryDetail, response ziti.MfaCodeResponse) {
+		reader := bufio.NewReader(os.Stdin)
+		codeok := false
+		for !codeok {
+			fmt.Print("Enter MFA: ")
+			code, _ := reader.ReadString('\n')
+			code = strings.TrimSpace(code)
+			fmt.Println("You entered:" + code + " - verifying")
+			if err := response(code); err != nil {
+				fmt.Println("error verifying MFA TOTP: ", err)
+			} else {
+				codeok = true
+			}
+		}
+	})
 	if err = ctx.Authenticate(); err != nil {
 		logrus.Errorf("error creating ziti context: %v", err)
 		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
 	}
+	/*
+		if deet, err := ctx.EnrollZitiMfa(); err != nil {
+			logrus.Fatalf("error enrolling ziti context: %v", err)
+		} else {
+			parsedURL, err := url.Parse(deet.ProvisioningURL)
+			if err != nil {
+				panic(err)
+			}
 
+			params := parsedURL.Query()
+			secret := params.Get("secret")
+			fmt.Println("Generate and enter the correct code to continue")
+			fmt.Println("  MFA TOTP Secret: ", secret)
+			fmt.Println("")
+			reader := bufio.NewReader(os.Stdin)
+			code := ""
+			for code == "" {
+				fmt.Print("Enter MFA: ")
+				code, _ = reader.ReadString('\n')
+				fmt.Println("You entered:", code, " - verifying")
+			}
+			if err := ctx.VerifyZitiMfa(strings.TrimSpace(code)); err != nil {
+				logrus.Fatalf("error verifying ziti context: %v", err)
+			}
+			fmt.Println("code verified")
+		}
+	*/
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
