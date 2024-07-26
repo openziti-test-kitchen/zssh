@@ -390,33 +390,6 @@ func EstablishClient(f SshFlags, target, targetIdentity, oidcToken string) *ssh.
 		logrus.Errorf("error creating ziti context: %v", err)
 		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
 	}
-	/*
-		if deet, err := ctx.EnrollZitiMfa(); err != nil {
-			logrus.Fatalf("error enrolling ziti context: %v", err)
-		} else {
-			parsedURL, err := url.Parse(deet.ProvisioningURL)
-			if err != nil {
-				panic(err)
-			}
-
-			params := parsedURL.Query()
-			secret := params.Get("secret")
-			fmt.Println("Generate and enter the correct code to continue")
-			fmt.Println("  MFA TOTP Secret: ", secret)
-			fmt.Println("")
-			reader := bufio.NewReader(os.Stdin)
-			code := ""
-			for code == "" {
-				fmt.Print("Enter MFA: ")
-				code, _ = reader.ReadString('\n')
-				fmt.Println("You entered:", code, " - verifying")
-			}
-			if err := ctx.VerifyZitiMfa(strings.TrimSpace(code)); err != nil {
-				logrus.Fatalf("error verifying ziti context: %v", err)
-			}
-			fmt.Println("code verified")
-		}
-	*/
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
