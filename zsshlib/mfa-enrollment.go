@@ -59,7 +59,7 @@ func EnableMFA(flags *SshFlags, oidcToken string) {
 		logrus.Errorf("error creating ziti context: %v", err)
 		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
 	}
-	fmt.Println("beginning EnrollZitiMfa")
+	
 	if deet, err := ctx.EnrollZitiMfa(); err != nil {
 		logrus.Fatalf("error enrolling ziti context: %v", err)
 	} else {
