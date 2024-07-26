@@ -2,13 +2,14 @@ package zsshlib
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 type SshFlags struct {
@@ -16,6 +17,15 @@ type SshFlags struct {
 	SshKeyPath  string
 	Debug       bool
 	ServiceName string
+	OIDC        OIDCFlags
+}
+
+type OIDCFlags struct {
+	Mode         bool
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	CallbackPort string
 }
 
 type ScpFlags struct {
@@ -69,6 +79,19 @@ func ParseFilePath(input string) string {
 		return input[colPos:]
 	}
 	return input
+}
+
+func MarkOidcagsRequired(cmd *cobra.Command) {
+	cmd.MarkFlagRequired("")
+}
+
+// TODO: Add config file support
+func (f *SshFlags) OIDCFlags(cmd *cobra.Command, exeName string) {
+	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "CallbackPort", "p", "63275", "Port for Callback. default: 63275")
+	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "cid1", "IdP ClientID. default: cid1")
+	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "ClientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
+	cmd.Flags().StringVarP(&f.OIDC.Issuer, "OIDCIssuer", "a", "https://dev-yourid.okta.com", "URL of the OpenID Connect provider. required")
+	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, "toggle OIDC mode. default: false")
 }
 
 func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {

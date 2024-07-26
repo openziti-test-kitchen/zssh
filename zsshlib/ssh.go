@@ -17,18 +17,28 @@
 package zsshlib
 
 import (
+	"context"
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
-	"github.com/pkg/errors"
-	"github.com/pkg/sftp"
+	"github.com/google/uuid"
+	"github.com/gorilla/securecookie"
+	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
+	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/openziti/sdk-golang/ziti"
+	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
+	"github.com/zitadel/oidc/v2/pkg/client/rp"
+	httphelper "github.com/zitadel/oidc/v2/pkg/http"
+	"golang.org/x/oauth2"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -40,10 +50,47 @@ const (
 	SSH_DIR = ".ssh"
 )
 
-func RemoteShell(client *ssh.Client) error {
+var (
+	DefaultAuthScopes = "openid profile"
+)
+
+func RemoteShell(client *ssh.Client, args []string) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
+	}
+
+	if len(args) > 0 {
+		if err := session.RequestPty("xterm", 80, 40, ssh.TerminalModes{}); err != nil {
+			logrus.Fatalf("Failed to request pseudo terminal: %v", err)
+		}
+
+		defer func() { _ = session.Close() }()
+
+		stdoutPipe, err := session.StdoutPipe()
+		if err != nil {
+			logrus.Fatal(os.Stderr, "Failed to create stdout pipe:", err)
+		}
+
+		stderrPipe, err := session.StderrPipe()
+		if err != nil {
+			logrus.Fatal("Failed to create stderr pipe:", err)
+		}
+
+		cmd := strings.Join(args, " ")
+		logrus.Infof("executing remote command: %v", cmd)
+		if err := session.Start(cmd); err != nil {
+			logrus.Fatal("Failed to start command:", err)
+		}
+
+		processOutput(stdoutPipe, stderrPipe)
+
+		// Wait for the command to finish
+		if err := session.Wait(); err != nil {
+			logrus.Fatal("Command execution failed:", err)
+		}
+
+		return nil
 	}
 
 	stdInFd := int(os.Stdin.Fd())
@@ -67,8 +114,6 @@ func RemoteShell(client *ssh.Client) error {
 		logrus.Fatal(err)
 	}
 
-	fmt.Println("connected.")
-
 	if err := session.RequestPty("xterm", termHeight, termWidth, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
 		return err
 	}
@@ -77,7 +122,10 @@ func RemoteShell(client *ssh.Client) error {
 	if err != nil {
 		return err
 	}
-	session.Wait()
+	err = session.Wait()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -87,6 +135,93 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// Config represents a config for the OIDC auth flow.
+type Config struct {
+	// CallbackPath is the path of the callback handler.
+	CallbackPath string
+
+	// CallbackPort is the port of the callback handler.
+	CallbackPort string
+
+	// Issuer is the URL of the OpenID Connect provider.
+	Issuer string
+
+	// HashKey is used to authenticate values using HMAC.
+	HashKey []byte
+
+	// BlockKey is used to encrypt values using AES.
+	BlockKey []byte
+
+	// IDToken is the ID token returned by the OIDC provider.
+	IDToken string
+
+	// Logger function for debug.
+	Logf func(format string, args ...interface{})
+
+	oauth2.Config
+}
+
+// GetToken starts a local HTTP server, opens the web browser to initiate the OIDC Discovery and
+// Token Exchange flow, blocks until the user completes authentication and is redirected back, and returns
+// the OIDC tokens.
+func GetToken(ctx context.Context, config *Config) (string, error) {
+	if err := config.validateAndSetDefaults(); err != nil {
+		return "", fmt.Errorf("invalid config: %w", err)
+	}
+
+	cookieHandler := httphelper.NewCookieHandler(config.HashKey, config.BlockKey, httphelper.WithUnsecure())
+
+	options := []rp.Option{
+		rp.WithCookieHandler(cookieHandler),
+		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
+	}
+	if config.ClientSecret == "" {
+		options = append(options, rp.WithPKCE(cookieHandler))
+	}
+
+	relyingParty, err := rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
+	if err != nil {
+		logrus.Fatalf("error creating relyingParty %s", err.Error())
+	}
+
+	//ctx := context.Background()
+	state := func() string {
+		return uuid.New().String()
+	}
+
+	resultChan := make(chan *oidc.Tokens[*oidc.IDTokenClaims])
+
+	go func() {
+		tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
+		resultChan <- tokens
+	}()
+
+	select {
+	case tokens := <-resultChan:
+		return tokens.IDToken, nil
+	case <-ctx.Done():
+		return "", errors.New("Timeout: OIDC authentication took too long")
+	}
+}
+
+// validateAndSetDefaults validates the config and sets default values.
+func (c *Config) validateAndSetDefaults() error {
+	if c.ClientID == "" {
+		return fmt.Errorf("ClientID must be set")
+	}
+
+	c.HashKey = securecookie.GenerateRandomKey(32)
+	c.BlockKey = securecookie.GenerateRandomKey(32)
+
+	if c.Logf == nil {
+		c.Logf = func(string, ...interface{}) {}
+	}
+
+	c.Scopes = strings.Split(DefaultAuthScopes, " ")
+
+	return nil
 }
 
 type SshConfigFactory interface {
@@ -163,7 +298,7 @@ func (factory *SshConfigFactoryImpl) Config() *ssh.ClientConfig {
 }
 
 func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
-	content, err := ioutil.ReadFile(keyPath)
+	content, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read zssh file [%s]: %w", keyPath, err)
 	}
@@ -182,7 +317,7 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 }
 
 func SendFile(client *sftp.Client, localPath string, remotePath string) error {
-	localFile, err := ioutil.ReadFile(localPath)
+	localFile, err := os.ReadFile(localPath)
 
 	if err != nil {
 		return errors.Wrapf(err, "unable to read local file %v", localFile)
@@ -193,7 +328,7 @@ func SendFile(client *sftp.Client, localPath string, remotePath string) error {
 	if err != nil {
 		return errors.Wrapf(err, "unable to open remote file %v", remotePath)
 	}
-	defer rmtFile.Close()
+	defer func() { _ = rmtFile.Close() }()
 
 	_, err = rmtFile.Write(localFile)
 	if err != nil {
@@ -226,27 +361,32 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, userName string, targetIdentity string) *ssh.Client {
-	ctx, err := ziti.NewContext(getConfig(f.ZConfig))
+func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
+	conf := getConfig(f.ZConfig)
+	ctx, err := ziti.NewContext(conf)
+	conf.Credentials.AddJWT(token)
 	if err != nil {
-		logrus.Fatalf("could not load config from: %s", f.ZConfig)
+		logrus.Fatalf("error creating ziti context: %v", err)
 	}
+
+	if err = ctx.Authenticate(); err != nil {
+		logrus.Errorf("error creating ziti context: %v", err)
+		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
+	}
+
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
 	}
-
 	dialOptions := &ziti.DialOptions{
 		ConnectTimeout: 0,
 		Identity:       targetIdentity,
 		AppData:        nil,
 	}
 	svc, err := ctx.DialWithOptions(f.ServiceName, dialOptions)
-
 	if err != nil {
 		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
 	}
-
 	factory := NewSshConfigFactoryImpl(userName, f.SshKeyPath)
 	config := factory.Config()
 	sshConn, err := Dial(config, svc)
@@ -284,4 +424,29 @@ func AppendBaseName(c *sftp.Client, remotePath string, localPath string, debug b
 		}
 	}
 	return remotePath
+}
+
+// processOutput processes the stdout and stderr streams concurrently
+func processOutput(stdout io.Reader, stderr io.Reader) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine to process stdout
+	go func() {
+		defer wg.Done()
+		if _, err := io.Copy(os.Stdout, stdout); err != nil {
+			log.Fatalf("Error copying stdout: %v", err)
+		}
+	}()
+
+	// Goroutine to process stderr
+	go func() {
+		defer wg.Done()
+		if _, err := io.Copy(os.Stdout, stdout); err != nil {
+			log.Fatalf("Error copying stderr: %v", err)
+		}
+	}()
+
+	// Wait for both goroutines to finish
+	wg.Wait()
 }

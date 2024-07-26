@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
@@ -43,7 +44,15 @@ var rootCmd = &cobra.Command{
 		var remoteFilePath string
 		var localFilePaths []string
 		var isCopyToRemote bool
+
+		token := ""
 		var err error
+		if flags.OIDC.Mode {
+			token, err = zsshlib.OIDCFlow(context.Background(), flags.SshFlags)
+			if err != nil {
+				logrus.Fatalf("error performing OIDC flow: %v", err)
+			}
+		}
 
 		if strings.ContainsAny(args[0], ":") {
 			remoteFilePath = args[0]
@@ -75,7 +84,7 @@ var rootCmd = &cobra.Command{
 		username, targetIdentity := flags.GetUserAndIdentity(remoteFilePath)
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity)
+		sshConn := zsshlib.EstablishClient(flags.SshFlags, username, targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
 
 		client, err := sftp.NewClient(sshConn)
@@ -181,6 +190,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 
