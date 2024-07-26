@@ -80,7 +80,7 @@ ziti edge enroll "${server_identity}.jwt"
 ziti edge enroll "${client_identity}.jwt"
 ```
 
-#### IF Using OIDC for Secondary Auth
+#### If Using OIDC for Secondary Auth
 
 You can now use OIDC for secondary auth. This example will use Keycloak federated to GitHub and Google
 * keycloak (or other OIDC server)
