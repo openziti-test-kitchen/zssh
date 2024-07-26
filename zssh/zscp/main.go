@@ -214,6 +214,7 @@ func after(value string, a string) string {
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags.SshFlags))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)
