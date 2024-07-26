@@ -88,7 +88,7 @@ func MarkOidcagsRequired(cmd *cobra.Command) {
 }
 
 // TODO: Add config file support
-func (f *SshFlags) OIDCFlags(cmd *cobra.Command, exeName string) {
+func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	defaults := config.DefaultConfig()
 	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "CallbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
 	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
@@ -100,9 +100,9 @@ func (f *SshFlags) OIDCFlags(cmd *cobra.Command, exeName string) {
 func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
 	defaults := config.DefaultConfig()
 	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", "", fmt.Sprintf("service name. default: %s", defaults.Service))
-	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
+	cmd.PersistentFlags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
 	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable additional debug information")
+	cmd.PersistentFlags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
 	/*
 		if f.SshKeyPath == "" {
 			userHome, err := os.UserHomeDir()

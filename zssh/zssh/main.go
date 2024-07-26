@@ -51,18 +51,9 @@ var rootCmd = &cobra.Command{
 		zsshlib.Combine(cmd, &flags, cfg)
 
 		cmdArgs := args[1:]
-		token := ""
-		var err error
-		if flags.OIDC.Mode {
-			token, err = zsshlib.OIDCFlow(context.Background(), flags)
-			if err != nil {
-				logrus.Fatalf("error performing OIDC flow: %v", err)
-			}
-		}
-		sshConn := zsshlib.EstablishClient(flags, args[0], targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(&flags, args[0], targetIdentity)
 		defer func() { _ = sshConn.Close() }()
-		err = zsshlib.RemoteShell(sshConn, cmdArgs)
-		if err != nil {
+		if err := zsshlib.RemoteShell(sshConn, cmdArgs); err != nil {
 			logrus.Fatalf("error opening remote shell: %v", err)
 		}
 	},
@@ -70,7 +61,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
-	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd)
 }
 
 // AuthCmd holds the required data for the init cmd
@@ -88,18 +79,19 @@ func NewAuthCmd(p common.OptionsProvider) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  cmd.Run,
 	}
-	flags.OIDCFlags(authCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(authCmd)
 	return authCmd
 }
 
 func (cmd *AuthCmd) Run(_ *cobra.Command, _ []string) error {
-	_, err := zsshlib.OIDCFlow(context.Background(), flags)
+	_, err := zsshlib.OIDCFlow(context.Background(), &flags)
 	return err
 }
 
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags))
 	// leave out for now // rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {

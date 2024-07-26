@@ -17,7 +17,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
@@ -46,15 +45,6 @@ var rootCmd = &cobra.Command{
 		var localFilePaths []string
 		var isCopyToRemote bool
 
-		token := ""
-		var err error
-		if flags.OIDC.Mode {
-			token, err = zsshlib.OIDCFlow(context.Background(), flags.SshFlags)
-			if err != nil {
-				logrus.Fatalf("error performing OIDC flow: %v", err)
-			}
-		}
-
 		if strings.ContainsAny(args[0], ":") {
 			remoteFilePath = args[0]
 			localFilePaths = args[1:]
@@ -70,10 +60,9 @@ var rootCmd = &cobra.Command{
 		} else {
 			logrus.Fatal(`cannot determine remote file PATH use ":" for remote path`)
 		}
-
+		var err error
 		for i, path := range localFilePaths {
-			localFilePaths[i], err = filepath.Abs(path)
-			if err != nil {
+			if localFilePaths[i], err = filepath.Abs(path); err != nil {
 				logrus.Fatalf("cannot determine absolute local file path, unrecognized file name: %s", path)
 			}
 			if _, err := os.Stat(localFilePaths[i]); err != nil {
@@ -88,7 +77,7 @@ var rootCmd = &cobra.Command{
 
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
 
-		sshConn := zsshlib.EstablishClient(flags.SshFlags, remoteFilePath, targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(&flags.SshFlags, remoteFilePath, targetIdentity)
 		defer func() { _ = sshConn.Close() }()
 
 		client, err := sftp.NewClient(sshConn)
@@ -194,7 +183,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
-	flags.OIDCFlags(rootCmd, ExpectedServiceAndExeName)
+	flags.OIDCFlags(rootCmd)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
 
@@ -214,6 +203,7 @@ func after(value string, a string) string {
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags.SshFlags))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)
