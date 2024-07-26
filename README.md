@@ -211,24 +211,26 @@ client_identity="zsshClient"
 server_identity="zsshServer"
 the_port=22
 ziti edge create config "${service_name}.host.v1" host.v1 \
-'{"protocol":"tcp", "address":"localhost", "port":'"$the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
+  '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
 ziti edge create service "${service_name}" --configs "${service_name}.host.v1"
-ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles ${service_name}.binders" --semantic "AnyOf"
-ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles ${service_name}.dialers" --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-binding" Bind \
+  --service-roles "@${service_name}" --identity-roles "#${service_name}.binders" --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-dialing" Dial \
+  --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers" --semantic "AnyOf"
 ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
 ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
 ziti edge enroll "${server_identity}.jwt"
 ziti edge enroll "${client_identity}.jwt"
+
+wget https://github.com/openziti/ziti-tunnel-sdk-c/releases/download/v1.1.0/ziti-edge-tunnel-Linux_x86_64.zip
+unzip ziti-edge-tunnel-Linux_x86_64.zip & rm ziti-edge-tunnel-Linux_x86_64.zip
 
 ./ziti-edge-tunnel run-host -i ./zsshServer.json
 ```
 
 #### window 3
 ```
-git checkout add-config-support
-mkdir build
-go build -o build ./...
-./build/zssh -i ./zsshClient.json zsshServer
+./build/zssh -c ./zsshClient.json zsshServer -s zsshTest -i ~/.encrypted/.ssh/id_ed25519
 ```
 
 
