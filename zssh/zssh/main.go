@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"zssh/config"
 	"zssh/zsshlib"
 
 	"github.com/openziti/ziti/common/enrollment"
@@ -45,7 +46,9 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		username, targetIdentity := flags.GetUserAndIdentity(args[0])
+		targetIdentity := zsshlib.ParseTargetIdentity(args[0])
+		cfg := config.FindConfigByKey(targetIdentity)
+		zsshlib.Combine(cmd, &flags, cfg)
 
 		cmdArgs := args[1:]
 		token := ""
@@ -56,7 +59,7 @@ var rootCmd = &cobra.Command{
 				logrus.Fatalf("error performing OIDC flow: %v", err)
 			}
 		}
-		sshConn := zsshlib.EstablishClient(flags, username, targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(flags, args[0], targetIdentity, token)
 		defer func() { _ = sshConn.Close() }()
 		err = zsshlib.RemoteShell(sshConn, cmdArgs)
 		if err != nil {

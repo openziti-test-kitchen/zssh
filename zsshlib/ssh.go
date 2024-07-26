@@ -137,8 +137,8 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-// Config represents a config for the OIDC auth flow.
-type Config struct {
+// OIDCConfig represents a config for the OIDC auth flow.
+type OIDCConfig struct {
 	// CallbackPath is the path of the callback handler.
 	CallbackPath string
 
@@ -166,7 +166,7 @@ type Config struct {
 // GetToken starts a local HTTP server, opens the web browser to initiate the OIDC Discovery and
 // Token Exchange flow, blocks until the user completes authentication and is redirected back, and returns
 // the OIDC tokens.
-func GetToken(ctx context.Context, config *Config) (string, error) {
+func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 	if err := config.validateAndSetDefaults(); err != nil {
 		return "", fmt.Errorf("invalid config: %w", err)
 	}
@@ -207,7 +207,7 @@ func GetToken(ctx context.Context, config *Config) (string, error) {
 }
 
 // validateAndSetDefaults validates the config and sets default values.
-func (c *Config) validateAndSetDefaults() error {
+func (c *OIDCConfig) validateAndSetDefaults() error {
 	if c.ClientID == "" {
 		return fmt.Errorf("ClientID must be set")
 	}
@@ -361,7 +361,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Client {
+func EstablishClient(f SshFlags, target, targetIdentity, token string) *ssh.Client {
 	conf := getConfig(f.ZConfig)
 	ctx, err := ziti.NewContext(conf)
 	conf.Credentials.AddJWT(token)
@@ -387,7 +387,15 @@ func EstablishClient(f SshFlags, userName, targetIdentity, token string) *ssh.Cl
 	if err != nil {
 		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
 	}
-	factory := NewSshConfigFactoryImpl(userName, f.SshKeyPath)
+	username := ParseUserName(target, false)
+	if username == "" {
+		if f.Username == "" {
+			username = ParseUserName(target, true)
+		} else {
+			username = f.Username
+		}
+	}
+	factory := NewSshConfigFactoryImpl(username, f.SshKeyPath)
 	config := factory.Config()
 	sshConn, err := Dial(config, svc)
 	if err != nil {
