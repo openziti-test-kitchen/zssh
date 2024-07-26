@@ -51,18 +51,9 @@ var rootCmd = &cobra.Command{
 		zsshlib.Combine(cmd, &flags, cfg)
 
 		cmdArgs := args[1:]
-		token := ""
-		var err error
-		if flags.OIDC.Mode {
-			token, err = zsshlib.OIDCFlow(context.Background(), &flags)
-			if err != nil {
-				logrus.Fatalf("error performing OIDC flow: %v", err)
-			}
-		}
-		sshConn := zsshlib.EstablishClient(flags, args[0], targetIdentity, token)
+		sshConn := zsshlib.EstablishClient(&flags, args[0], targetIdentity)
 		defer func() { _ = sshConn.Close() }()
-		err = zsshlib.RemoteShell(sshConn, cmdArgs)
-		if err != nil {
+		if err := zsshlib.RemoteShell(sshConn, cmdArgs); err != nil {
 			logrus.Fatalf("error opening remote shell: %v", err)
 		}
 	},

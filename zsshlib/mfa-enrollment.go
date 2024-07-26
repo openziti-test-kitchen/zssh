@@ -1,15 +1,10 @@
 package zsshlib
 
 import (
-	"bufio"
-	"context"
 	"fmt"
-	"github.com/openziti/sdk-golang/ziti"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"net/url"
-	"os"
-	"strings"
 	"zssh/config"
 )
 
@@ -19,7 +14,7 @@ func NewMfaCmd(flags *SshFlags) *cobra.Command {
 		Short: "Manage MFA for the provided identity",
 	}
 
-	mfaCmd.AddCommand(NewEnableCmd(flags))
+	mfaCmd.AddCommand(NewEnableCmd(flags), NewRemoveMfaCmd(flags))
 	return mfaCmd
 }
 
@@ -30,16 +25,7 @@ func NewEnableCmd(flags *SshFlags) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := config.DefaultConfig()
 			Combine(cmd, flags, cfg)
-
-			oidcToken := ""
-			var err error
-			if flags.OIDC.Mode {
-				oidcToken, err = OIDCFlow(context.Background(), flags)
-				if err != nil {
-					logrus.Fatalf("error performing OIDC flow: %v", err)
-				}
-			}
-			EnableMFA(flags, oidcToken)
+			EnableMFA(flags)
 		},
 	}
 
@@ -47,19 +33,24 @@ func NewEnableCmd(flags *SshFlags) *cobra.Command {
 	return cmd
 }
 
-func EnableMFA(flags *SshFlags, oidcToken string) {
-	conf := getConfig(flags.ZConfig)
-	ctx, err := ziti.NewContext(conf)
-	conf.Credentials.AddJWT(oidcToken)
-	if err != nil {
-		logrus.Fatalf("error creating ziti context: %v", err)
+func NewRemoveMfaCmd(flags *SshFlags) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove MFA. Removes the MFA TOTP enablement for the provided identity",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg := config.DefaultConfig()
+			Combine(cmd, flags, cfg)
+			RemoveMfa(flags)
+		},
 	}
 
-	if err = ctx.Authenticate(); err != nil {
-		logrus.Errorf("error creating ziti context: %v", err)
-		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
-	}
-	
+	flags.OIDCFlags(cmd)
+	return cmd
+}
+
+func EnableMFA(flags *SshFlags) {
+	ctx := Auth(flags)
+
 	if deet, err := ctx.EnrollZitiMfa(); err != nil {
 		logrus.Fatalf("error enrolling ziti context: %v", err)
 	} else {
@@ -76,14 +67,10 @@ func EnableMFA(flags *SshFlags, oidcToken string) {
 		fmt.Println()
 		fmt.Println("  MFA TOTP Secret: ", secret)
 		fmt.Println()
-		reader := bufio.NewReader(os.Stdin)
-		code := ""
-		for code == "" {
-			fmt.Print("Enter MFA: ")
-			code, _ = reader.ReadString('\n')
-			code = strings.TrimSpace(code)
-			fmt.Println("You entered: " + code + " - verifying")
-		}
+
+		code := ReadCode()
+		fmt.Println("You entered: " + code + " - attempting to verify MFA TOTP")
+
 		if err := ctx.VerifyZitiMfa(code); err != nil {
 			logrus.Fatalf("error verifying ziti context: %v", err)
 		}
@@ -107,5 +94,14 @@ func EnableMFA(flags *SshFlags, oidcToken string) {
 		}
 
 		fmt.Println("└────────┴────────┴────────┴────────┴────────┘")
+	}
+}
+
+func RemoveMfa(flags *SshFlags) {
+	ctx := Auth(flags)
+	code := ReadCode()
+	fmt.Println("You entered: " + code + " - attempting to remove MFA TOTP")
+	if err := ctx.RemoveZitiMfa(code); err != nil {
+		logrus.Fatalf("error removing MFA TOTP: %v", err)
 	}
 }

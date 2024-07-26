@@ -17,12 +17,10 @@
 package zsshlib
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
-	"github.com/openziti/edge-api/rest_model"
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
@@ -363,30 +361,9 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 	return nil
 }
 
-func EstablishClient(f SshFlags, target, targetIdentity, oidcToken string) *ssh.Client {
-	conf := getConfig(f.ZConfig)
-	ctx, err := ziti.NewContext(conf)
-	conf.Credentials.AddJWT(oidcToken)
-	if err != nil {
-		logrus.Fatalf("error creating ziti context: %v", err)
-	}
-
-	ctx.Events().AddMfaTotpCodeListener(func(c ziti.Context, detail *rest_model.AuthQueryDetail, response ziti.MfaCodeResponse) {
-		reader := bufio.NewReader(os.Stdin)
-		codeok := false
-		for !codeok {
-			fmt.Print("Enter MFA: ")
-			code, _ := reader.ReadString('\n')
-			code = strings.TrimSpace(code)
-			fmt.Println("You entered:" + code + " - verifying")
-			if err := response(code); err != nil {
-				fmt.Println("error verifying MFA TOTP: ", err)
-			} else {
-				codeok = true
-			}
-		}
-	})
-	if err = ctx.Authenticate(); err != nil {
+func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Client {
+	ctx := Auth(f)
+	if err := ctx.Authenticate(); err != nil {
 		logrus.Errorf("error creating ziti context: %v", err)
 		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
 	}
