@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-func Auth(flags *SshFlags) ziti.Context {
+func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 	oidcToken := ""
 	var oidcErr error
 	if flags.OIDC.Mode {
@@ -28,37 +28,40 @@ func Auth(flags *SshFlags) ziti.Context {
 		logrus.Fatalf("error creating ziti context: %v", err)
 	}
 
-	ctx.Events().AddMfaTotpCodeListener(func(c ziti.Context, detail *rest_model.AuthQueryDetail, response ziti.MfaCodeResponse) {
-		reader := bufio.NewReader(os.Stdin)
-		codeok := false
-		for !codeok {
-			fmt.Print("Enter MFA: ")
-			code, _ := reader.ReadString('\n')
-			code = strings.TrimSpace(code)
-			fmt.Println("You entered:" + code + " - verifying")
-			if err := response(code); err != nil {
-				fmt.Println("error verifying MFA TOTP: ", err)
-			} else {
-				codeok = true
+	if enableMfaListener {
+		ctx.Events().AddMfaTotpCodeListener(func(c ziti.Context, detail *rest_model.AuthQueryDetail, response ziti.MfaCodeResponse) {
+			ok := false
+			for !ok {
+				code := ReadCode(false)
+				if err := response(code); err != nil {
+					fmt.Println("error verifying MFA TOTP: ", err)
+				} else {
+					ok = true
+				}
 			}
-		}
-	})
-
-	if err = ctx.Authenticate(); err != nil {
-		logrus.Errorf("error creating ziti context: %v", err)
-		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
+		})
 	}
 
 	return ctx
 }
 
-func ReadCode() string {
+func Auth(ctx ziti.Context) {
+	if err := ctx.Authenticate(); err != nil {
+		logrus.Errorf("error creating ziti context: %v", err)
+		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
+	}
+}
+
+func ReadCode(allowEmpty bool) string {
 	code := ""
 	reader := bufio.NewReader(os.Stdin)
 	for code == "" {
-		fmt.Print("Enter MFA: ")
+		fmt.Print("MFA TOTP code: ")
 		code, _ = reader.ReadString('\n')
 		code = strings.TrimSpace(code)
+		if allowEmpty {
+			break
+		}
 	}
 	return code
 }

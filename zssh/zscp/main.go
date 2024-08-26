@@ -18,17 +18,19 @@ package main
 
 import (
 	"fmt"
-	"github.com/openziti/ziti/common/enrollment"
-	"github.com/openziti/ziti/ziti/cmd/common"
-	"github.com/pkg/sftp"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"zssh/config"
 	"zssh/zsshlib"
+
+	"github.com/pkg/sftp"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"github.com/openziti/ziti/common/enrollment"
+	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
 const ExpectedServiceAndExeName = "zssh"
@@ -182,7 +184,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 	flags.OIDCFlags(rootCmd)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }

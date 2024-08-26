@@ -26,6 +26,7 @@ type OIDCFlags struct {
 	ClientID     string
 	ClientSecret string
 	CallbackPort string
+	AsAscii      bool
 }
 
 type ScpFlags struct {
@@ -97,12 +98,13 @@ func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, fmt.Sprintf("toggle OIDC mode. default: %t", defaults.OIDC.Enabled))
 }
 
-func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
+func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
 	defaults := config.DefaultConfig()
 	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", "", fmt.Sprintf("service name. default: %s", defaults.Service))
-	cmd.PersistentFlags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
 	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.PersistentFlags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
+	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
+	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
+
 	/*
 		if f.SshKeyPath == "" {
 			userHome, err := os.UserHomeDir()

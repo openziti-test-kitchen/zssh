@@ -362,11 +362,9 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 }
 
 func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Client {
-	ctx := Auth(f)
-	if err := ctx.Authenticate(); err != nil {
-		logrus.Errorf("error creating ziti context: %v", err)
-		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
-	}
+	ctx := NewContext(f, true)
+	Auth(ctx)
+	
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)
