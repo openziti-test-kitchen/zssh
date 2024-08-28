@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 	"zssh/config"
-	"zssh/zssh"
+	"zssh/gendoc"
 	"zssh/zsshlib"
 
 	"github.com/openziti/ziti/common/enrollment"
@@ -91,7 +91,7 @@ func (cmd *AuthCmd) Run(_ *cobra.Command, _ []string) error {
 func main() {
 	flags.AddCommonFlags(rootCmd)
 	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags))
-	rootCmd.AddCommand(zssh.NewGendocsCmd(rootCmd))
+	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
 
