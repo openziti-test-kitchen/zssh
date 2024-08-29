@@ -285,18 +285,11 @@ identity_based_only=$(ziti edge create auth-policy "${auth_policy_name}-identity
     --primary-cert-expired-allowed)
 echo "identity_based_only created with id: ${identity_based_only}"
 
-identity_and_oidc_broken=$(ziti edge create auth-policy "${auth_policy_name}-identity-and-oidc-broken" \
+identity_and_oidc=$(ziti edge create auth-policy "${auth_policy_name}-identity-and-oidc" \
     --primary-cert-allowed \
     --primary-cert-expired-allowed \
     --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
-echo "identity_and_oidc created with id: ${identity_and_oidc_broken}"
-
-identity_and_oidc_works=$(ziti edge create auth-policy "${auth_policy_name}-identity-and-oidc-works" \
-    --primary-cert-allowed \
-    --primary-cert-expired-allowed \
-    --primary-ext-jwt-allowed \
-    --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
-echo "identity_and_oidc created with id: ${identity_and_oidc_works}"
+echo "identity_and_oidc created with id: ${identity_and_oidc}"
 
 oidc_only=$(ziti edge create auth-policy "${auth_policy_name}-oidc-only" \
     --primary-ext-jwt-allowed \
@@ -393,7 +386,7 @@ ziti edge update identity "${client_identity}" \
 
 # login using identity-based auth for primary and oidc for secondary
 ziti edge update identity "${client_identity}" \
-  --auth-policy "${auth_policy_name}-identity-and-oidc-broken"
+  --auth-policy "${auth_policy_name}-identity-and-oidc"
 ./build/zssh \
     -i "${private_key}" \
     -s "${service_name}" \
@@ -403,20 +396,6 @@ ziti edge update identity "${client_identity}" \
     -c "${identity_file}" \
     -p 1234 \
     "${user_id}@${server_identity}"
-
-# login using identity-based auth for primary and oidc for secondary
-ziti edge update identity "${client_identity}" \
-  --auth-policy "${auth_policy_name}-identity-and-oidc-works"
-./build/zssh \
-    -i "${private_key}" \
-    -s "${service_name}" \
-    -o \
-    -a "${oidc_issuer}" \
-    -n openziti-client \
-    -c "${identity_file}" \
-    -p 1234 \
-    "${user_id}@${server_identity}"
-    
 
 # login using idp-based auth
 ziti edge update identity "${client_identity}" \
@@ -428,7 +407,16 @@ ziti edge update identity "${client_identity}" \
     -a "${oidc_issuer}" \
     -n openziti-client \
     -p 1234 \
+    --oidcOnly --controllerUrl https://localhost:1280 \
     "${user_id}@${server_identity}"
+
+
+
+
+
+
+
+
 
 
 ./build/zssh mfa enable \

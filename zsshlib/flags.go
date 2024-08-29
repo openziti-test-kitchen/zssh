@@ -21,12 +21,14 @@ type SshFlags struct {
 }
 
 type OIDCFlags struct {
-	Mode         bool
-	Issuer       string
-	ClientID     string
-	ClientSecret string
-	CallbackPort string
-	AsAscii      bool
+	Mode          bool
+	Issuer        string
+	ClientID      string
+	ClientSecret  string
+	CallbackPort  string
+	AsAscii       bool
+	OIDCOnly      bool
+	ControllerUrl string
 }
 
 type ScpFlags struct {
@@ -91,11 +93,13 @@ func MarkOidcagsRequired(cmd *cobra.Command) {
 // TODO: Add config file support
 func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	defaults := config.DefaultConfig()
-	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "CallbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
-	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
-	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "ClientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
-	cmd.Flags().StringVarP(&f.OIDC.Issuer, "OIDCIssuer", "a", "", "URL of the OpenID Connect provider. required")
+	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "callbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
+	cmd.Flags().StringVarP(&f.OIDC.ClientID, "clientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
+	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "clientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
+	cmd.Flags().StringVarP(&f.OIDC.Issuer, "oidcIssuer", "a", "", "URL of the OpenID Connect provider. required")
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, fmt.Sprintf("toggle OIDC mode. default: %t", defaults.OIDC.Enabled))
+	cmd.Flags().BoolVar(&f.OIDC.OIDCOnly, "oidcOnly", false, "toggle OIDC only mode. default: false")
+	cmd.Flags().StringVar(&f.OIDC.ControllerUrl, "controllerUrl", "", "the url of the controller to use. only used with --oidcOnly")
 }
 
 func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {

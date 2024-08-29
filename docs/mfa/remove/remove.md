@@ -9,16 +9,18 @@ zssh mfa remove [flags]
 ### Options
 
 ```
-  -p, --CallbackPort string   Port for Callback. default: 63275
-  -n, --ClientID string       IdP ClientID. default: openziti-client
-  -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
-  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required
-  -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string        Path to ziti config file. default: /home/cd/.config/zssh/default.json
-  -d, --debug                 pass to enable any additional debug information
-  -h, --help                  help for remove
-  -o, --oidc                  toggle OIDC mode. default: false
-  -s, --service string        service name. default: zssh
+  -i, --SshKeyPath string      Path to ssh key. default: $HOME/.ssh/id_rsa
+  -c, --ZConfig string         Path to ziti config file. default: /home/cd/.config/zssh/default.json
+  -p, --callbackPort string    Port for Callback. default: 63275
+  -n, --clientID string        IdP ClientID. default: openziti-client
+  -e, --clientSecret string    IdP ClientSecret. default: (empty string - use PKCE)
+      --controllerUrl string   the url of the controller to use. only used with --oidcOnly
+  -d, --debug                  pass to enable any additional debug information
+  -h, --help                   help for remove
+  -o, --oidc                   toggle OIDC mode. default: false
+  -a, --oidcIssuer string      URL of the OpenID Connect provider. required
+      --oidcOnly               toggle OIDC only mode. default: false
+  -s, --service string         service name. default: zssh
 ```
 
 ### SEE ALSO
