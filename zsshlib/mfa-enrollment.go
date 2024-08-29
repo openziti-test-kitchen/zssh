@@ -30,6 +30,7 @@ func NewEnableCmd(flags *SshFlags) *cobra.Command {
 		},
 	}
 
+	flags.AddCommonFlags(cmd)
 	flags.OIDCFlags(cmd)
 	cmd.Flags().BoolVarP(&flags.OIDC.AsAscii, "qr-code", "q", false, fmt.Sprintf("display MFA secret as ascii QR code: %t", false))
 	return cmd
@@ -46,6 +47,7 @@ func NewRemoveMfaCmd(flags *SshFlags) *cobra.Command {
 		},
 	}
 
+	flags.AddCommonFlags(cmd)
 	flags.OIDCFlags(cmd)
 	return cmd
 }

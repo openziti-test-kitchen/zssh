@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	gendoc "github.com/openziti/cobra-to-md"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -203,8 +204,10 @@ func after(value string, a string) string {
 
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
+	flags.AddCommonFlags(rootCmd)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
 	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags.SshFlags))
+	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)

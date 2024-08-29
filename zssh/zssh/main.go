@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"os"
 	"zssh/config"
-	"zssh/gendoc"
 	"zssh/zsshlib"
 
-	"github.com/openziti/ziti/common/enrollment"
-	"github.com/openziti/ziti/ziti/cmd/common"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/openziti/cobra-to-md"
+	"github.com/openziti/ziti/common/enrollment"
+	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
 const ExpectedServiceAndExeName = "zssh"
