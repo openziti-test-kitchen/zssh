@@ -38,7 +38,7 @@ const ExpectedServiceAndExeName = "zssh"
 
 var flags = &zsshlib.ScpFlags{}
 var rootCmd = &cobra.Command{
-	Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
+	Use: "zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
 		"Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path]",
 	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
