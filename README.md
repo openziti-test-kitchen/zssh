@@ -7,9 +7,13 @@ time, but we're looking for feedback. It's our assertion that these tools will c
 of your needs. If you find you are missing a favorite feature - please open an issue! We'd love to 
 hear your feedback.
 
-Read about CLI usage:
+Read blogs about zssh/zsp:
 * zssh - [https://docs.openziti.io/blog/zitification/zitifying-ssh/](https://blog.openziti.io/zitifying-ssh)
 * zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
+
+See docs for all CLI commands:
+* zssh - [docs/zssh.md]()
+* zscp - [docs/zscp.md]()
 
 ## Basic Usage
 zssh:
