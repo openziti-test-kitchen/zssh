@@ -30,6 +30,12 @@ jobs:
            zssh_asset_name: zssh-macos-amd64
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-macos-amd64
+         - os: macos-latest
+           arch: macos-arm64
+           zssh_artifact_name: zssh
+           zssh_asset_name: zssh-macos-arm64
+           zscp_artifact_name: zscp
+           zscp_asset_name: zscp-macos-arm64
          - os: ubuntu-latest
            arch: linux-arm
            go_opts: CC=arm-linux-gnueabi-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm
