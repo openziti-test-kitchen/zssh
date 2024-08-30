@@ -233,12 +233,12 @@ If for some reason you don't want to tear down your OpenZiti overlay, you can ru
 * one external jwt signer
 
 
-    ziti edge delete configs where 'name contains "'"${service_name}"'"'
-    ziti edge delete service where 'name contains "'"${service_name}"'"'
-    ziti edge delete service-policies where 'name contains "'"${service_name}"'"'
-    ziti edge delete identities where 'name contains "'"${service_name}"'"'
-    ziti edge delete auth-policies where 'name contains "'"${service_name}"'"'
-    ziti edge delete ext-jwt-signer where 'name contains "'"${service_name}"'"'
+      ziti edge delete configs where 'name contains "'"${service_name}"'"'
+      ziti edge delete service where 'name contains "'"${service_name}"'"'
+      ziti edge delete service-policies where 'name contains "'"${service_name}"'"'
+      ziti edge delete identities where 'name contains "'"${service_name}"'"'
+      ziti edge delete auth-policies where 'name contains "'"${service_name}"'"'
+      ziti edge delete ext-jwt-signer where 'name contains "'"${service_name}"'"'
 
 ## Adding TOTP
 
