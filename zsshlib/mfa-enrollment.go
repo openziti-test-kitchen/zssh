@@ -2,6 +2,8 @@ package zsshlib
 
 import (
 	"fmt"
+	edgeapis "github.com/openziti/sdk-golang/edge-apis"
+	"github.com/openziti/sdk-golang/ziti"
 	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"github.com/spf13/cobra"
@@ -111,15 +113,21 @@ func EnableMFA(flags *SshFlags) {
 }
 
 func RemoveMfa(flags *SshFlags) {
-	ctx := NewContext(flags, false)
+	ctx := NewContext(flags, true)
+	done := make(chan bool)
+	ctx.Events().AddAuthenticationStateFullListener(func(context ziti.Context, session edgeapis.ApiSession) {
+		go func() {
+			fmt.Println()
+			fmt.Println("If MFA TOTP has been successfully enrolled, you must enter a valid code or a valid recovery code,")
+			fmt.Println("otherwise, enter any value to continue.")
+			fmt.Println()
+			code := ReadCode(true)
+			if err := ctx.RemoveZitiMfa(code); err != nil {
+				logrus.Fatalf("error removing MFA TOTP: %v", err)
+			}
+			done <- true
+		}()
+	})
 	Auth(ctx)
-
-	fmt.Println()
-	fmt.Println("If MFA TOTP has been successfully enrolled, you must enter a valid code or a valid recovery code,")
-	fmt.Println("otherwise, enter any value to continue.")
-	fmt.Println()
-	code := ReadCode(true)
-	if err := ctx.RemoveZitiMfa(code); err != nil {
-		logrus.Fatalf("error removing MFA TOTP: %v", err)
-	}
+	<-done
 }

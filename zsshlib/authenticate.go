@@ -65,6 +65,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 		ctx.Events().AddMfaTotpCodeListener(func(c ziti.Context, detail *rest_model.AuthQueryDetail, response ziti.MfaCodeResponse) {
 			ok := false
 			for !ok {
+				fmt.Println("MFA TOTP required to fully authenticate")
 				code := ReadCode(false)
 				if err := response(code); err != nil {
 					fmt.Println("error verifying MFA TOTP: ", err)
