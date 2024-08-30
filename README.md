@@ -172,7 +172,7 @@ identity running `zssh/zscp` will change the authentication mechanism.
 
     # login using the default policy
     ziti edge update identity "${client_identity}" \
-      --auth-policy "${auth_policy_name}-identity-based"
+      --auth-policy "${service_name}.${auth_policy_name}-identity-based"
     ./build/zssh \
       -i "${private_key}" \
       -s "${service_name}" \
@@ -194,7 +194,7 @@ identity is mapped to the cliam using an external id, secondary auth will succee
 
       # login using identity-based auth for primary and oidc for secondary
       ziti edge update identity "${client_identity}" \
-        --auth-policy "${auth_policy_name}-identity-and-oidc"
+        --auth-policy "${service_name}.${auth_policy_name}-identity-and-oidc"
       ./build/zssh \
         -i "${private_key}" \
         -s "${service_name}" \
@@ -210,7 +210,7 @@ identity is mapped to the cliam using an external id, secondary auth will succee
 
     # login using idp-based auth
     ziti edge update identity "${client_identity}" \
-      --auth-policy "${auth_policy_name}-oidc-only"
+      --auth-policy "${service_name}.${auth_policy_name}-oidc-only"
     ./build/zssh \
       -i "${private_key}" \
       -s "${service_name}" \
@@ -248,7 +248,7 @@ authentication. Pass the proper params to the `mfa enable` or `mfa remove` to ad
 Example using client-based auth:
 
     ziti edge update identity "${client_identity}" \
-      --auth-policy "${auth_policy_name}-identity-and-oidc"
+      --auth-policy "${service_name}.${auth_policy_name}-identity-and-oidc"
     ./build/zssh mfa enable \
       -o \
       -a "${oidc_issuer}" \
