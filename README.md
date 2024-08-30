@@ -12,8 +12,8 @@ Read blogs about zssh/zsp:
 * zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
 
 See docs for all CLI commands:
-* zssh - [docs/zssh.md]()
-* zscp - [docs/zscp.md]()
+* zssh - [docs/zssh.md](./docs/zssh.md)
+* zscp - [docs/zscp.md](./docs/zscp.md)
 
 ## Basic Usage
 zssh:
