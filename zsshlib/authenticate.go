@@ -16,7 +16,7 @@ import (
 func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 	oidcToken := ""
 	var oidcErr error
-	if flags.OIDC.Mode || flags.OIDC.OIDCOnly {
+	if flags.OIDC.Mode {
 		oidcToken, oidcErr = OIDCFlow(context.Background(), flags)
 		if oidcErr != nil {
 			logrus.Fatalf("error performing OIDC flow: %v", oidcErr)
