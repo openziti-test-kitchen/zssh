@@ -16,6 +16,11 @@ import (
 func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 	oidcToken := ""
 	var oidcErr error
+
+	if flags.OIDC.OIDCOnly && !flags.OIDC.Mode {
+		flags.OIDC.Mode = true //override Mode to true
+	}
+
 	if flags.OIDC.Mode {
 		oidcToken, oidcErr = OIDCFlow(context.Background(), flags)
 		if oidcErr != nil {

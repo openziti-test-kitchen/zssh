@@ -364,7 +364,7 @@ func RetrieveRemoteFiles(client *sftp.Client, localPath string, remotePath strin
 func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Client {
 	ctx := NewContext(f, true)
 	Auth(ctx)
-	
+
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
 		logrus.Fatalf("service not found: %s", f.ServiceName)

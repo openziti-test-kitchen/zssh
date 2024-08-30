@@ -100,9 +100,6 @@ func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, fmt.Sprintf("toggle OIDC mode. default: %t", defaults.OIDC.Enabled))
 	cmd.Flags().BoolVar(&f.OIDC.OIDCOnly, "oidcOnly", false, "toggle OIDC only mode. default: false")
 	cmd.Flags().StringVar(&f.OIDC.ControllerUrl, "controllerUrl", "", "the url of the controller to use. only used with --oidcOnly")
-	if f.OIDC.OIDCOnly {
-		f.OIDC.Mode = true
-	}
 }
 
 func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
