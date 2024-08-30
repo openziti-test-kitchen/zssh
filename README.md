@@ -173,7 +173,7 @@ identity running `zssh/zscp` will change the authentication mechanism.
     # login using the default policy
     ziti edge update identity "${client_identity}" \
       --auth-policy "${service_name}.${auth_policy_name}-identity-based"
-    ./build/zssh \
+    zssh \
       -i "${private_key}" \
       -s "${service_name}" \
       -c "${client_identity}.json" \
@@ -195,7 +195,7 @@ identity is mapped to the cliam using an external id, secondary auth will succee
       # login using identity-based auth for primary and oidc for secondary
       ziti edge update identity "${client_identity}" \
         --auth-policy "${service_name}.${auth_policy_name}-identity-and-oidc"
-      ./build/zssh \
+      zssh \
         -i "${private_key}" \
         -s "${service_name}" \
         -o \
@@ -211,7 +211,7 @@ identity is mapped to the cliam using an external id, secondary auth will succee
     # login using idp-based auth
     ziti edge update identity "${client_identity}" \
       --auth-policy "${service_name}.${auth_policy_name}-oidc-only"
-    ./build/zssh \
+    zssh \
       -i "${private_key}" \
       -s "${service_name}" \
       -o \
@@ -249,21 +249,21 @@ Example using client-based auth:
 
     ziti edge update identity "${client_identity}" \
       --auth-policy "${service_name}.${auth_policy_name}-identity-and-oidc"
-    ./build/zssh mfa enable \
+    zssh mfa enable \
       -o \
       -a "${oidc_issuer}" \
       -n openziti-client \
       -c "${client_identity}.json" \
       -p 1234
     
-    ./build/zssh mfa remove \
+    zssh mfa remove \
       -o \
       -a "${oidc_issuer}" \
       -n openziti-client \
       -c "${client_identity}.json" \
       -p 1234
     
-    ./build/zssh \
+    zssh \
       -i "${private_key}" \
       -s "${service_name}" \
       -o \
@@ -281,7 +281,7 @@ scp example:
     echo "a" > a.txt
     
     # scp the a.txt file as b.txt
-    ./build/zscp \
+    zscp \
       -i "${private_key}" \
       -s "${service_name}" \
       -o \
@@ -293,7 +293,7 @@ scp example:
 
 Use zssh and a remote command to verify b.txt was transferred and contains the proper contents:
 
-    ./build/zssh \
+    zssh \
       -i "${private_key}" \
       -s "${service_name}" \
       -o \
