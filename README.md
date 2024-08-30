@@ -78,7 +78,7 @@ OpenZiti overlay network, hopefully making them easy to find if needed.
     claim="email"
     auth_policy_name="keycloak_auth_policy"
     private_key=
-    user_id="remote.username.here"
+    user_id="$USER" #use the real remote user id here
 
 #### Create Configs, Service, and Service Policies
 
@@ -108,21 +108,21 @@ authorizing the identities to `dial` and `bind` the service.
 The following commands will create an External JWT signer and use that signer with the three different expected auth 
 policies: certificate, certificate with secondary OIDC, OIDC only:
 
-    ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$oidc_issuer" -u "$jwks" -a "$aud" -c "$claim")
+    ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${service_name}.${ext_signer_name}" "$oidc_issuer" -u "$jwks" -a "$aud" -c "$claim")
     echo "External JWT signer created with id: $ext_jwt_signer_id"
     
-    identity_based_only=$(ziti edge create auth-policy "${auth_policy_name}-identity-based" \
+    identity_based_only=$(ziti edge create auth-policy "${service_name}.${auth_policy_name}-identity-based" \
     --primary-cert-allowed \
     --primary-cert-expired-allowed)
     echo "identity_based_only created with id: ${identity_based_only}"
     
-    identity_and_oidc=$(ziti edge create auth-policy "${auth_policy_name}-identity-and-oidc" \
+    identity_and_oidc=$(ziti edge create auth-policy "${service_name}.${auth_policy_name}-identity-and-oidc" \
     --primary-cert-allowed \
     --primary-cert-expired-allowed \
     --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
     echo "identity_and_oidc created with id: ${identity_and_oidc}"
     
-    oidc_only=$(ziti edge create auth-policy "${auth_policy_name}-oidc-only" \
+    oidc_only=$(ziti edge create auth-policy "${service_name}.${auth_policy_name}-oidc-only" \
     --primary-ext-jwt-allowed \
     --primary-ext-jwt-allowed-signers "${ext_jwt_signer_id}")
     echo "oidc_only created with id: ${oidc_only}"
@@ -222,6 +222,23 @@ identity is mapped to the cliam using an external id, secondary auth will succee
       --controllerUrl https://localhost:1280 \
       "${user_id}@${server_identity}"
 
+### Manual Cleanup
+
+If for some reason you don't want to tear down your OpenZiti overlay, you can run these commands to clean up the:
+* two configs
+* one service
+* two service policies
+* two identities
+* three auth policies
+* one external jwt signer
+
+
+    ziti edge delete configs where 'name contains "'"${service_name}"'"'
+    ziti edge delete service where 'name contains "'"${service_name}"'"'
+    ziti edge delete service-policies where 'name contains "'"${service_name}"'"'
+    ziti edge delete identities where 'name contains "'"${service_name}"'"'
+    ziti edge delete auth-policies where 'name contains "'"${service_name}"'"'
+    ziti edge delete ext-jwt-signer where 'name contains "'"${service_name}"'"'
 
 ## Adding TOTP
 
