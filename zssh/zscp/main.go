@@ -18,24 +18,27 @@ package main
 
 import (
 	"fmt"
-	"github.com/openziti/ziti/common/enrollment"
-	"github.com/openziti/ziti/ziti/cmd/common"
-	"github.com/pkg/sftp"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
+	gendoc "github.com/openziti/cobra-to-md"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"zssh/config"
 	"zssh/zsshlib"
+
+	"github.com/pkg/sftp"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"github.com/openziti/ziti/common/enrollment"
+	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
 const ExpectedServiceAndExeName = "zssh"
 
 var flags = &zsshlib.ScpFlags{}
 var rootCmd = &cobra.Command{
-	Use: "Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
+	Use: "zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
 		"Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path]",
 	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
@@ -182,7 +185,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 	flags.OIDCFlags(rootCmd)
 	rootCmd.Flags().BoolVarP(&flags.Recursive, "recursive", "r", false, "pass to enable recursive file transfer")
 }
@@ -202,8 +204,10 @@ func after(value string, a string) string {
 
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
+	flags.AddCommonFlags(rootCmd)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
 	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags.SshFlags))
+	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	e := rootCmd.Execute()
 	if e != nil {
 		logrus.Error(e)

@@ -21,11 +21,14 @@ type SshFlags struct {
 }
 
 type OIDCFlags struct {
-	Mode         bool
-	Issuer       string
-	ClientID     string
-	ClientSecret string
-	CallbackPort string
+	Mode          bool
+	Issuer        string
+	ClientID      string
+	ClientSecret  string
+	CallbackPort  string
+	AsAscii       bool
+	OIDCOnly      bool
+	ControllerUrl string
 }
 
 type ScpFlags struct {
@@ -90,19 +93,22 @@ func MarkOidcagsRequired(cmd *cobra.Command) {
 // TODO: Add config file support
 func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	defaults := config.DefaultConfig()
-	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "CallbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
-	cmd.Flags().StringVarP(&f.OIDC.ClientID, "ClientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
-	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "ClientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
-	cmd.Flags().StringVarP(&f.OIDC.Issuer, "OIDCIssuer", "a", "", "URL of the OpenID Connect provider. required")
+	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "callbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
+	cmd.Flags().StringVarP(&f.OIDC.ClientID, "clientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
+	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "clientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
+	cmd.Flags().StringVarP(&f.OIDC.Issuer, "oidcIssuer", "a", "", "URL of the OpenID Connect provider. required")
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, fmt.Sprintf("toggle OIDC mode. default: %t", defaults.OIDC.Enabled))
+	cmd.Flags().BoolVar(&f.OIDC.OIDCOnly, "oidcOnly", false, "toggle OIDC only mode. default: false")
+	cmd.Flags().StringVar(&f.OIDC.ControllerUrl, "controllerUrl", "", "the url of the controller to use. only used with --oidcOnly")
 }
 
-func (f *SshFlags) InitFlags(cmd *cobra.Command, exeName string) {
+func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
 	defaults := config.DefaultConfig()
 	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", "", fmt.Sprintf("service name. default: %s", defaults.Service))
-	cmd.PersistentFlags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
 	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.PersistentFlags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
+	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
+	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
+
 	/*
 		if f.SshKeyPath == "" {
 			userHome, err := os.UserHomeDir()

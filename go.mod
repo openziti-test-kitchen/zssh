@@ -7,13 +7,15 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/natefinch/npipe v0.0.0-20160621034901-c1b8fa8bdcce
-	github.com/openziti/edge-api v0.26.21
-	github.com/openziti/sdk-golang v0.23.39
+	github.com/openziti/cobra-to-md v0.0.0-20240827152831-dab4eaadf278
+	github.com/openziti/edge-api v0.26.23
+	github.com/openziti/sdk-golang v0.23.40
 	github.com/openziti/ziti v0.32.0-alpha-1
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.5
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.8.0
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/zitadel/oidc/v2 v2.12.0
 	golang.org/x/crypto v0.25.0
@@ -25,6 +27,7 @@ require (
 	github.com/Jeffail/gabs v1.4.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa // indirect
@@ -73,6 +76,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/speps/go-hashids v2.0.0+incompatible // indirect

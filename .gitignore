@@ -2,3 +2,5 @@
 build
 
 zssh*json
+.run
+ziti-edge-tunnel*

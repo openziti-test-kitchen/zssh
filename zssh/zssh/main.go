@@ -23,10 +23,12 @@ import (
 	"zssh/config"
 	"zssh/zsshlib"
 
-	"github.com/openziti/ziti/common/enrollment"
-	"github.com/openziti/ziti/ziti/cmd/common"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/openziti/cobra-to-md"
+	"github.com/openziti/ziti/common/enrollment"
+	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
 const ExpectedServiceAndExeName = "zssh"
@@ -36,7 +38,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   fmt.Sprintf("%s <remoteUsername>@<targetIdentity>", flags.ServiceName),
+	Use:   fmt.Sprintf("%s %s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName, flags.ServiceName),
 	Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.MinimumNArgs(1),
@@ -60,7 +62,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	flags.InitFlags(rootCmd, ExpectedServiceAndExeName)
 	flags.OIDCFlags(rootCmd)
 }
 
@@ -89,9 +90,12 @@ func (cmd *AuthCmd) Run(_ *cobra.Command, _ []string) error {
 }
 
 func main() {
+	flags.AddCommonFlags(rootCmd)
+	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags))
+	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
-	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags))
+
 	// leave out for now // rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {

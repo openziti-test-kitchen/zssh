@@ -18,16 +18,16 @@ Usage:
    <remoteUsername>@<targetIdentity> [flags]
 
 Flags:
-  -p, --CallbackPort string   Port for Callback. default: 63275 (default "63275")
-  -n, --ClientID string       IdP ClientID. default: cid1 (default "cid1")
+  -p, --CallbackPort string   Port for Callback. default: 63275
+  -n, --ClientID string       IdP ClientID. default: openziti-client
   -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
-  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required (default "https://dev-yourid.okta.com")
+  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required
   -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string        Path to ziti config file. default: $HOME/.ziti/zssh.json
-  -d, --debug                 pass to enable additional debug information
+  -c, --ZConfig string        Path to ziti config file. default: /home/cd/.config/zssh/default.json
+  -d, --debug                 pass to enable any additional debug information
   -h, --help                  help for this command
   -o, --oidc                  toggle OIDC mode. default: false
-  -s, --service string        service name. default: zssh (default "zssh")
+  -s, --service string        service name. default: zssh
 ```
 
 ## zscp usage
@@ -38,7 +38,7 @@ Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remot
 
 Flags:
   -p, --CallbackPort string   Port for Callback. default: 63275 (default "63275")
-  -n, --ClientID string       IdP ClientID. default: cid1 (default "cid1")
+  -n, --ClientID string       IdP ClientID. default: openziti-client (default "openziti-client")
   -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
   -a, --OIDCIssuer string     URL of the OpenID Connect provider. required (default "https://dev-yourid.okta.com")
   -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
@@ -61,20 +61,35 @@ service_name=zsshSvc
 client_identity="${service_name}Client"
 server_identity="${service_name}Server"
 the_port=22
+YOUR_EMAIL_ADDRESS=
 ```
 
 #### Create Configs, Service, and Service Policies
 ```
-ziti edge create config "${service_name}.host.v1" host.v1 '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
+ziti edge create config "${service_name}.host.v1" host.v1 \
+  '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
 # intercept is not needed for zscp/zssh but make it for testing if you like
-ziti edge create config "${service_name}.intercept.v1" intercept.v1 '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
-ziti edge create service "${service_name}" --configs "${service_name}.intercept.v1","${service_name}.host.v1"
-ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles "#${service_name}.binders" --semantic "AnyOf"
-ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles "#${service_name}.dialers" --semantic "AnyOf"
+ziti edge create config "${service_name}.intercept.v1" intercept.v1 \
+  '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
+ziti edge create service "${service_name}" \
+  --configs "${service_name}.intercept.v1","${service_name}.host.v1"
+ziti edge create service-policy "${service_name}-binding" Bind \
+  --service-roles "@${service_name}" \
+  --identity-roles "#${service_name}.binders" \
+  --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-dialing" Dial \
+  --service-roles "@${service_name}" \
+  --identity-roles "#${service_name}.dialers" \
+  --semantic "AnyOf"
 
-# create two identities. one host - one client. Only necessary if you want/need them. Skippable if you have identities already
-ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
-ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
+# create two identities. one host - one client. Only necessary if you want/need them. 
+# Skippable if you have identities already
+ziti edge create identity "${server_identity}" \
+  -a "${service_name}.binders" \
+  -o "${server_identity}.jwt"
+ziti edge create identity "${client_identity}" \
+  -a "${service_name}.dialers" \
+  -o "${client_identity}.jwt"
 
 ziti edge enroll "${server_identity}.jwt"
 ziti edge enroll "${client_identity}.jwt"
@@ -91,13 +106,13 @@ You can now use OIDC for secondary auth. This example will use Keycloak federate
 * create an identity in OpenZiti with an external-id matching the claim from above
 
 ```
-YOUR_EMAIL_ADDRESS=
 ext_signer_name="keycloak-ext-jwt-signer"
 iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
 jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
-aud="cid1"
+aud="openziti-client"
 claim="email"
 auth_policy_name="keycloak_auth_policy"
+YOUR_EMAIL_ADDRESS=
 
 ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
 echo "External JWT signer created with id: $ext_jwt_signer_id"
@@ -108,10 +123,36 @@ keycloak_auth_policy=$(ziti edge create auth-policy "${auth_policy_name}" \
     --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
 echo "keycloak_auth_policy created with id: ${keycloak_auth_policy}"
 
-ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
-ziti edge update identity zsshSvcClient --external-id $YOUR_EMAIL_ADDRESS
+ziti edge update identity "${server_identity}" \
+  --auth-policy "${keycloak_auth_policy}" \
+  --external-id $YOUR_EMAIL_ADDRESS
+  
+./build/zssh \
+  -s "${service_name}" \
+  -i ~/.encrypted/.ssh/id_ed25519 \
+  -c ./zsshClient.json \
+  "${server_identity}"
 ```
 
+#### OIDC for Primary Auth
+```
+auth_policy_name="keycloak_auth_policy_primary_auth"
+
+# reuse the ext-jwt-signer
+ext_jwt_signer_id=$(ziti edge list ext-jwt-signers 'name = "keycloak-ext-jwt-signer"' -j | jq -r .data[].id)
+# or create a new one
+ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
+echo "External JWT signer created with id: $ext_jwt_signer_id"
+
+keycloak_auth_policy_primary=$(ziti edge create auth-policy "${auth_policy_name}" \
+    --primary-ext-jwt-allowed \
+    --primary-ext-jwt-allowed-signers "${ext_jwt_signer_id}")
+echo "keycloak_auth_policy created with id: ${keycloak_auth_policy_primary}"
+
+ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
+ziti edge update identity zsshSvcClient --external-id $YOUR_EMAIL_ADDRESS
+ziti edge update identity zsshSvcClient --auth-policy keycloak_auth_policy_primary
+```
 
 
 #### Clean Up and Start Again
@@ -151,7 +192,7 @@ ssh example:
     -s zsshSvc \
     -o \
     -a ${oidc_issuer} \
-    -n cid1 \
+    -n openziti-client \
     -c ${identity_file} \
     ubuntu@zsshSvcServer
 ```
@@ -165,7 +206,7 @@ the contents of the remote connection with colorized results:
     -s zsshSvc \
     -o \
     -a ${oidc_issuer} \
-    -n cid1 \
+    -n openziti-client \
     -c ${identity_file} \
     ubuntu@zsshSvcServer \
     -- ls -l --color=auto
@@ -175,13 +216,13 @@ scp example:
 ```
 ./build/zscp \
     -i ${private_key} \
-    -s zsshSvc \
+    -s "${service_name}" \
     -o \
     -a https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm \
-    -n cid1 \
+    -n openziti-client \
     -c ${identity_file} \
     SECURITY.md \
-    ubuntu@zsshSvcServer:.
+    "${user_id}@${server_identity}":.
 ```
 
 ssh remote command to verify SECURITY.md was transferred:
@@ -191,7 +232,7 @@ ssh remote command to verify SECURITY.md was transferred:
     -s zsshSvc \
     -o \
     -a ${oidc_issuer} \
-    -n cid1 \
+    -n openziti-client \
     -c ${identity_file} \
     ubuntu@zsshSvcServer \
     -- ls -l SECURITY.md
@@ -200,35 +241,249 @@ ssh remote command to verify SECURITY.md was transferred:
 ## Testing Locally
 #### window 1
 ```
-ziti egde quickstart
+ziti edge quickstart
 ```
 
 #### window 2
 ```
+# make sure you're in the zssh project folder
 ziti edge login localhost:1280 -u admin -p admin -y
 service_name=zsshTest
 client_identity="zsshClient"
 server_identity="zsshServer"
 the_port=22
+YOUR_EMAIL_ADDRESS=clint.dovholuk@netfoundry.io
+
 ziti edge create config "${service_name}.host.v1" host.v1 \
-'{"protocol":"tcp", "address":"localhost", "port":'"$the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
-ziti edge create service "${service_name}" --configs "${service_name}.host.v1"
-ziti edge create service-policy "${service_name}-binding" Bind --service-roles "@${service_name}" --identity-roles ${service_name}.binders" --semantic "AnyOf"
-ziti edge create service-policy "${service_name}-dialing" Dial --service-roles "@${service_name}" --identity-roles ${service_name}.dialers" --semantic "AnyOf"
-ziti edge create identity "${server_identity}" -a "${service_name}.binders" -o "${server_identity}.jwt"
-ziti edge create identity "${client_identity}" -a "${service_name}.dialers" -o "${client_identity}.jwt"
+  '{"protocol":"tcp", "address":"localhost","port":'"${the_port}"', "listenOptions": {"bindUsingEdgeIdentity":true}}'
+# intercept is not needed for zscp/zssh but make it for testing if you like
+ziti edge create config "${service_name}.intercept.v1" intercept.v1 \
+  '{"protocols":["tcp"],"addresses":["'"${service_name}.ziti"'"], "portRanges":[{"low":'"${the_port}"', "high":'"${the_port}"'}]}'
+ziti edge create service "${service_name}" \
+  --configs "${service_name}.intercept.v1","${service_name}.host.v1"
+ziti edge create service-policy "${service_name}-binding" Bind \
+  --service-roles "@${service_name}" \
+  --identity-roles "#${service_name}.binders" \
+  --semantic "AnyOf"
+ziti edge create service-policy "${service_name}-dialing" Dial \
+  --service-roles "@${service_name}" \
+  --identity-roles "#${service_name}.dialers" \
+  --semantic "AnyOf"
+
+ext_signer_name="keycloak-ext-jwt-signer"
+iss="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
+jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
+aud="openziti-client"
+claim="email"
+auth_policy_name="keycloak_auth_policy"
+
+ext_jwt_signer_id=$(ziti edge create ext-jwt-signer "${ext_signer_name}" "$iss" -u "$jwks" -a "$aud" -c "$claim")
+echo "External JWT signer created with id: $ext_jwt_signer_id"
+
+identity_based_only=$(ziti edge create auth-policy "${auth_policy_name}-identity-based" \
+    --primary-cert-allowed \
+    --primary-cert-expired-allowed)
+echo "identity_based_only created with id: ${identity_based_only}"
+
+identity_and_oidc=$(ziti edge create auth-policy "${auth_policy_name}-identity-and-oidc" \
+    --primary-cert-allowed \
+    --primary-cert-expired-allowed \
+    --secondary-req-ext-jwt-signer "${ext_jwt_signer_id}")
+echo "identity_and_oidc created with id: ${identity_and_oidc}"
+
+oidc_only=$(ziti edge create auth-policy "${auth_policy_name}-oidc-only" \
+    --primary-ext-jwt-allowed \
+    --primary-ext-jwt-allowed-signers "${ext_jwt_signer_id}")
+echo "oidc_only created with id: ${oidc_only}"
+
+# create and enroll two test identities
+ziti edge create identity "${server_identity}" \
+  -a "${service_name}.binders" \
+  -o "${server_identity}.jwt"
 ziti edge enroll "${server_identity}.jwt"
+
+ziti edge create identity "${client_identity}" \
+  -a "${service_name}.dialers" \
+  -o "${client_identity}.jwt" \
+  --external-id $YOUR_EMAIL_ADDRESS
 ziti edge enroll "${client_identity}.jwt"
 
-./ziti-edge-tunnel run-host -i ./zsshServer.json
+./ziti-edge-tunnel run-host -i "./${server_identity}.json"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# A test identity using jwt authentication only
+ziti edge create identity "${client_identity}-identity-only" \
+  -a "${service_name}.dialers" \
+  -o "${client_identity}.jwt"
+ziti edge enroll "${client_identity}.jwt"
+
+
+ziti edge update identity "${client_identity}" \
+  --auth-policy "${keycloak_auth_policy}" \
+  --external-id $YOUR_EMAIL_ADDRESS
+  
 ```
 
 #### window 3
 ```
-git checkout add-config-support
-mkdir build
-go build -o build ./...
-./build/zssh -i ./zsshClient.json zsshServer
+# make sure you're in the zssh project folder
+ziti edge login localhost:1280 -u admin -p admin -y
+service_name=zsshTest
+client_identity="zsshClient"
+server_identity="zsshServer"
+the_port=22
+user_id="cd"
+auth_policy_name="keycloak_auth_policy"
+
+private_key="${HOME}/.encrypted/.ssh/id_ed25519"
+oidc_issuer=https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm
+identity_file="${PWD}/${client_identity}.json"
+
+
+# login using the default policy
+ziti edge update identity "${client_identity}" \
+  --auth-policy "${auth_policy_name}-identity-based"
+./build/zssh \
+    -i "${private_key}" \
+    -s "${service_name}" \
+    -c "${identity_file}" \
+    "${user_id}@${server_identity}"
+
+# login using identity-based auth for primary and oidc for secondary
+ziti edge update identity "${client_identity}" \
+  --auth-policy "${auth_policy_name}-identity-and-oidc"
+./build/zssh \
+    -i "${private_key}" \
+    -s "${service_name}" \
+    -o \
+    -a "${oidc_issuer}" \
+    -n openziti-client \
+    -c "${identity_file}" \
+    -p 1234 \
+    "${user_id}@${server_identity}"
+
+# login using idp-based auth
+ziti edge update identity "${client_identity}" \
+  --auth-policy "${auth_policy_name}-oidc-only"
+./build/zssh \
+    -i "${private_key}" \
+    -s "${service_name}" \
+    -o \
+    -a "${oidc_issuer}" \
+    -n openziti-client \
+    -p 1234 \
+    --oidcOnly --controllerUrl https://localhost:1280 \
+    "${user_id}@${server_identity}"
+
+
+
+
+
+
+
+
+
+
+./build/zssh mfa enable \
+  -c "${identity_file}" \
+    -o \
+    -a "${oidc_issuer}" \
+    -n openziti-client \
+    -p 1234
+
+
+
+
+
+ziti edge update identity zsshSvcClient -P "${keycloak_auth_policy}"
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+extra stuff here
+```
+./build/zssh \
+  -s "${service_name}" \
+  -i ~/.encrypted/.ssh/id_ed25519 \
+  -c "./${client_identity}.json" \
+  "${server_identity}"
+  
+  
+./build/zssh -c ./zsshClient.json "${server_identity}" -s zsshTest -i ~/.encrypted/.ssh/id_ed25519
+
+# enable mfa
+./build/zssh mfa enable -c "${identity_file}"
+./build/zssh mfa remove -c "${identity_file}"
+
+
+
+
+./build/zssh \
+    mfa enable \
+    -o \
+    -a "${oidc_issuer}" \
+    -n openziti-client \
+    -c "${identity_file}"
+
+
+
+./build/zssh \
+    mfa remove \
+    -o \
+    -a "${oidc_issuer}" \
+    -n openziti-client \
+    -c "${identity_file}"
+
+
 ```
 
 

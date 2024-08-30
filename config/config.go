@@ -83,7 +83,7 @@ func DefaultConfig() *Config {
 		Service:    "zssh",
 		OIDC: OIDC{
 			CallbackPort: "63275",
-			ClientID:     "cid1",
+			ClientID:     "openziti-client",
 			ClientSecret: "",
 			Issuer:       "https://dev-yourid.okta.com",
 			Enabled:      false,
