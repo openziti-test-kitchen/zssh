@@ -51,7 +51,7 @@ jobs:
            zscp_artifact_name: zscp
            zscp_asset_name: zscp-linux-arm64
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5

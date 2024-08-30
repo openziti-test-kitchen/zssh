@@ -7,47 +7,18 @@ time, but we're looking for feedback. It's our assertion that these tools will c
 of your needs. If you find you are missing a favorite feature - please open an issue! We'd love to 
 hear your feedback.
 
-Read about:
+Read about CLI usage:
 * zssh - [https://docs.openziti.io/blog/zitification/zitifying-ssh/](https://blog.openziti.io/zitifying-ssh)
 * zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
 
-## zssh usage
+## Basic Usage
+zssh:
 ```
-Error: accepts 1 arg(s), received 0
-Usage:
-   <remoteUsername>@<targetIdentity> [flags]
-
-Flags:
-  -p, --CallbackPort string   Port for Callback. default: 63275
-  -n, --ClientID string       IdP ClientID. default: openziti-client
-  -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
-  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required
-  -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string        Path to ziti config file. default: /home/cd/.config/zssh/default.json
-  -d, --debug                 pass to enable any additional debug information
-  -h, --help                  help for this command
-  -o, --oidc                  toggle OIDC mode. default: false
-  -s, --service string        service name. default: zssh
+   zssh -c identity.json <remoteUsername>@<targetIdentity> [flags]
 ```
-
-## zscp usage
+zscp:
 ```
-Usage:
-  Remote to Local: zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]
-Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path] [flags]
-
-Flags:
-  -p, --CallbackPort string   Port for Callback. default: 63275 (default "63275")
-  -n, --ClientID string       IdP ClientID. default: openziti-client (default "openziti-client")
-  -e, --ClientSecret string   IdP ClientSecret. default: (empty string - use PKCE)
-  -a, --OIDCIssuer string     URL of the OpenID Connect provider. required (default "https://dev-yourid.okta.com")
-  -i, --SshKeyPath string     Path to ssh key. default: $HOME/.ssh/id_rsa
-  -c, --ZConfig string        Path to ziti config file. default: $HOME/.ziti/zssh.json
-  -d, --debug                 pass to enable additional debug information
-  -h, --help                  help for Remote
-  -o, --oidc                  toggle OIDC mode. default: false
-  -r, --recursive             pass to enable recursive file transfer
-  -s, --service string        service name. default: zssh (default "zssh")
+  zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]
 ```
 
 ## zssh/zscp Quickstart
