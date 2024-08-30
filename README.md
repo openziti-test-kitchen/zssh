@@ -8,8 +8,8 @@ of your needs. If you find you are missing a favorite feature - please open an i
 hear your feedback.
 
 Read about:
-* zssh - [https://docs.openziti.io/blog/zitification/zitifying-ssh/](https://blog.openziti.io/zitifying-ssh)
-* zscp - [https://docs.openziti.io/blog/zitification/zitifying-scp/](https://blog.openziti.io/zitifying-scp)
+* zssh - [https://blog.openziti.io/zitifying-scp](https://blog.openziti.io/zitifying-ssh)
+* zscp - [https://blog.openziti.io/zitifying-scp](https://blog.openziti.io/zitifying-scp)
 
 Explore the CLI yourself, or look through the CLI commands online to explore usage etc.
 * [zssh usage](./docs/zssh/zssh.md)
@@ -69,7 +69,7 @@ OpenZiti overlay network, hopefully making them easy to find if needed.
     client_identity="${service_name}Client"
     server_identity="${service_name}Server"
     the_port=22
-    YOUR_EMAIL_ADDRESS=clint.dovholuk@netfoundry.io
+    YOUR_EMAIL_ADDRESS=
 
     ext_signer_name="keycloak-ext-jwt-signer"
     oidc_issuer="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
@@ -77,8 +77,8 @@ OpenZiti overlay network, hopefully making them easy to find if needed.
     aud="openziti-client"
     claim="email"
     auth_policy_name="keycloak_auth_policy"
-    private_key="${HOME}/.encrypted/.ssh/id_ed25519"
-    user_id="cd"
+    private_key=
+    user_id="remote.username.here"
 
 #### Create Configs, Service, and Service Policies
 
