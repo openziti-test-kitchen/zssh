@@ -192,18 +192,18 @@ identity is mapped to the cliam using an external id, secondary auth will succee
 * create an identity in OpenZiti with an external-id matching the claim from above
 
 
-    # login using identity-based auth for primary and oidc for secondary
-    ziti edge update identity "${client_identity}" \
-      --auth-policy "${auth_policy_name}-identity-and-oidc"
-    ./build/zssh \
-      -i "${private_key}" \
-      -s "${service_name}" \
-      -o \
-      -a "${oidc_issuer}" \
-      -n openziti-client \
-      -c "${client_identity}.json" \
-      -p 1234 \
-      "${user_id}@${server_identity}"
+      # login using identity-based auth for primary and oidc for secondary
+      ziti edge update identity "${client_identity}" \
+        --auth-policy "${auth_policy_name}-identity-and-oidc"
+      ./build/zssh \
+        -i "${private_key}" \
+        -s "${service_name}" \
+        -o \
+        -a "${oidc_issuer}" \
+        -n openziti-client \
+        -c "${client_identity}.json" \
+        -p 1234 \
+        "${user_id}@${server_identity}"
 
 
 ### OIDC Authentication Only
