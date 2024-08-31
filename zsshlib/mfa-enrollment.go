@@ -4,11 +4,9 @@ import (
 	"fmt"
 	edgeapis "github.com/openziti/sdk-golang/edge-apis"
 	"github.com/openziti/sdk-golang/ziti"
-	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"github.com/spf13/cobra"
 	"net/url"
-	"zssh/config"
 )
 
 func NewMfaCmd(flags *SshFlags) *cobra.Command {
@@ -26,7 +24,7 @@ func NewEnableCmd(flags *SshFlags) *cobra.Command {
 		Use:   "enable",
 		Short: "Enable MFA. Enables MFA TOTP for the provided identity",
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := config.DefaultConfig()
+			cfg := DefaultConfig()
 			Combine(cmd, flags, cfg)
 			EnableMFA(flags)
 		},
@@ -43,7 +41,7 @@ func NewRemoveMfaCmd(flags *SshFlags) *cobra.Command {
 		Use:   "remove",
 		Short: "Remove MFA. Removes the MFA TOTP enablement for the provided identity",
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := config.DefaultConfig()
+			cfg := DefaultConfig()
 			Combine(cmd, flags, cfg)
 			RemoveMfa(flags)
 		},
@@ -59,10 +57,10 @@ func EnableMFA(flags *SshFlags) {
 	Auth(ctx)
 
 	if deet, err := ctx.EnrollZitiMfa(); err != nil {
-		logrus.Error("Attempting to enroll for MFA TOTP failed.")
-		logrus.Error("This identity is likely already enrolled or is in the process of being enrolled.")
-		logrus.Error("To continue the MFA TOTP enrollment process you must \"remove\" MFA TOTP first.")
-		logrus.Fatalf("Run \"mfa remove\" to clear the current state, then try again.")
+		log.Error("Attempting to enroll for MFA TOTP failed.")
+		log.Error("This identity is likely already enrolled or is in the process of being enrolled.")
+		log.Error("To continue the MFA TOTP enrollment process you must \"remove\" MFA TOTP first.")
+		log.Fatalf("Run \"mfa remove\" to clear the current state, then try again.")
 	} else {
 		parsedURL, err := url.Parse(deet.ProvisioningURL)
 		if err != nil {
@@ -77,17 +75,22 @@ func EnableMFA(flags *SshFlags) {
 		fmt.Println()
 		fmt.Println("  MFA TOTP Secret: ", secret)
 
-		var q *qrcode.QRCode
-		q, err = qrcode.New(fmt.Sprintf("otpauth://totp/zsshlabel?secret=%s&issuer=zssh", secret), qrcode.Highest)
-		art := q.ToString(false)
-		fmt.Println(art)
+		if flags.OIDC.AsAscii {
+			var q *qrcode.QRCode
+			q, err = qrcode.New(fmt.Sprintf("otpauth://totp/zsshlabel?secret=%s&issuer=zssh", secret), qrcode.Highest)
+			if err != nil {
+				log.Fatalf("Failed to generate QR Code for MFA enrollment: %v", err)
+			}
+			art := q.ToString(false)
+			fmt.Println(art)
+		}
 
 		fmt.Println()
 
 		code := ReadCode(false)
 
 		if err := ctx.VerifyZitiMfa(code); err != nil {
-			logrus.Fatalf("error verifying ziti context: %v", err)
+			log.Fatalf("error verifying ziti context: %v", err)
 		}
 		fmt.Println()
 		fmt.Println("Code verified. These are your recovery codes. Save these codes somewhere safe.")
@@ -123,9 +126,10 @@ func RemoveMfa(flags *SshFlags) {
 			fmt.Println()
 			code := ReadCode(true)
 			if err := ctx.RemoveZitiMfa(code); err != nil {
-				logrus.Fatalf("error removing MFA TOTP: %v", err)
+				log.Fatalf("error removing MFA TOTP: %v", err)
 			}
 			done <- true
+			fmt.Println("MFA TOTP removed")
 		}()
 	})
 	Auth(ctx)

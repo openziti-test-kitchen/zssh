@@ -2,13 +2,10 @@ package zsshlib
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"os/user"
 	"runtime"
 	"strings"
-	"zssh/config"
-
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 type SshFlags struct {
@@ -39,7 +36,7 @@ type ScpFlags struct {
 func (f *SshFlags) GetUserAndIdentity(input string) (string, string) {
 	username := ParseUserName(input, true)
 	targetIdentity := ParseTargetIdentity(input)
-	f.DebugLog("targetIdentity set to: %s", targetIdentity)
+	log.Debugf("targetIdentity set to: %s", targetIdentity)
 	return username, targetIdentity
 }
 
@@ -53,7 +50,7 @@ func ParseUserName(input string, returnDefault bool) string {
 
 			curUser, err := user.Current()
 			if err != nil {
-				logrus.Fatal(err)
+				log.Fatal(err)
 			}
 			username = curUser.Username
 			if strings.Contains(username, "\\") && runtime.GOOS == "windows" {
@@ -86,13 +83,9 @@ func ParseFilePath(input string) string {
 	return input
 }
 
-func MarkOidcagsRequired(cmd *cobra.Command) {
-	cmd.MarkFlagRequired("")
-}
-
 // TODO: Add config file support
 func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
-	defaults := config.DefaultConfig()
+	defaults := DefaultConfig()
 	cmd.Flags().StringVarP(&f.OIDC.CallbackPort, "callbackPort", "p", "", "Port for Callback. default: "+defaults.OIDC.CallbackPort)
 	cmd.Flags().StringVarP(&f.OIDC.ClientID, "clientID", "n", "", "IdP ClientID. default: "+defaults.OIDC.ClientID)
 	cmd.Flags().StringVarP(&f.OIDC.ClientSecret, "clientSecret", "e", "", "IdP ClientSecret. default: (empty string - use PKCE)")
@@ -103,17 +96,17 @@ func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 }
 
 func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
-	defaults := config.DefaultConfig()
+	defaults := DefaultConfig()
 	cmd.Flags().StringVarP(&f.ServiceName, "service", "s", "", fmt.Sprintf("service name. default: %s", defaults.Service))
 	cmd.Flags().StringVarP(&f.SshKeyPath, "SshKeyPath", "i", "", "Path to ssh key. default: $HOME/.ssh/id_rsa")
-	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+config.DefaultIdentityFile()))
+	cmd.Flags().StringVarP(&f.ZConfig, "ZConfig", "c", "", fmt.Sprintf("Path to ziti config file. default: "+DefaultIdentityFile()))
 	cmd.Flags().BoolVarP(&f.Debug, "debug", "d", false, "pass to enable any additional debug information")
 
 	/*
 		if f.SshKeyPath == "" {
 			userHome, err := os.UserHomeDir()
 			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir? %v", err)
+				log.Fatalf("could not find UserHomeDir? %v", err)
 			}
 			f.SshKeyPath = filepath.Join(userHome, SSH_DIR, ID_RSA)
 		}
@@ -122,7 +115,7 @@ func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
 		if f.ZConfig == "" {
 			userHome, err := os.UserHomeDir()
 			if err != nil {
-				logrus.Fatalf("could not find UserHomeDir? %v", err)
+				log.Fatalf("could not find UserHomeDir? %v", err)
 			}
 			f.ZConfig = filepath.Join(userHome, ".ziti", fmt.Sprintf("%s.json", exeName))
 		}
@@ -130,8 +123,8 @@ func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
 	*/
 }
 
-func Combine(cmd *cobra.Command, c *SshFlags, cfg *config.Config) {
-	d := config.DefaultConfig()
+func Combine(cmd *cobra.Command, c *SshFlags, cfg *Config) {
+	d := DefaultConfig()
 	if c.ZConfig == "" {
 		if cfg.ZConfig == "" {
 			c.ZConfig = d.ZConfig

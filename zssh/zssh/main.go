@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"zssh/config"
 	"zssh/zsshlib"
 
 	"github.com/sirupsen/logrus"
@@ -43,20 +42,21 @@ var rootCmd = &cobra.Command{
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		logrus.StandardLogger().Level = logrus.FatalLevel
 		if len(args) < 1 {
 			fmt.Println("You need to specify at least one positional argument")
 			os.Exit(1)
 		}
 
 		targetIdentity := zsshlib.ParseTargetIdentity(args[0])
-		cfg := config.FindConfigByKey(targetIdentity)
+		cfg := zsshlib.FindConfigByKey(targetIdentity)
 		zsshlib.Combine(cmd, &flags, cfg)
 
 		cmdArgs := args[1:]
-		sshConn := zsshlib.EstablishClient(&flags, args[0], targetIdentity)
-		defer func() { _ = sshConn.Close() }()
-		if err := zsshlib.RemoteShell(sshConn, cmdArgs); err != nil {
-			logrus.Fatalf("error opening remote shell: %v", err)
+		sshClient := zsshlib.EstablishClient(&flags, args[0], targetIdentity)
+		defer func() { _ = sshClient.Close() }()
+		if err := zsshlib.RemoteShell(sshClient, cmdArgs); err != nil {
+			zsshlib.Logger().Fatalf("error opening remote shell: %v", err)
 		}
 	},
 }
@@ -99,6 +99,6 @@ func main() {
 	// leave out for now // rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()
 	if e != nil {
-		logrus.Error(e)
+		zsshlib.Logger().Error(e)
 	}
 }

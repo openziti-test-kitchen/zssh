@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-
-	"github.com/sirupsen/logrus"
 )
 
 func OIDCFlow(initialContext context.Context, flags *SshFlags) (string, error) {
@@ -21,20 +19,20 @@ func OIDCFlow(initialContext context.Context, flags *SshFlags) (string, error) {
 		CallbackPath: callbackPath,
 		CallbackPort: flags.OIDC.CallbackPort,
 		Issuer:       flags.OIDC.Issuer,
-		Logf:         logrus.Debugf,
+		Logf:         log.Debugf,
 	}
 	waitFor := 30 * time.Second
 	ctx, cancel := context.WithTimeout(initialContext, waitFor)
 	defer cancel() // Ensure the cancel function is called to release resources
 
-	logrus.Infof("OIDC requested. If the CLI appears to be hung, check your browser for a login prompt. Waiting up to %v", waitFor)
+	log.Infof("OIDC requested. If the CLI appears to be hung, check your browser for a login prompt. Waiting up to %v", waitFor)
 	token, err := GetToken(ctx, cfg)
 	if err != nil {
 		return "", err
 	}
 
-	logrus.Debugf("ID token: %s", token)
-	logrus.Infof("OIDC auth flow succeeded")
+	log.Debugf("ID token: %s", token)
+	log.Infof("OIDC auth flow succeeded")
 
 	return token, nil
 }

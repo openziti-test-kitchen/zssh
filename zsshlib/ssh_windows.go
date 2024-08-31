@@ -18,7 +18,6 @@ package zsshlib
 
 import (
 	"github.com/natefinch/npipe"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"sync"
@@ -38,7 +37,7 @@ func sshAuthMethodAgent() ssh.AuthMethod {
 	} else {
 		warnOnce.Do(func() {
 			pipePresent = false
-			logrus.WithError(err).Debug("could not connect to openssh-ssh-agent pipe, is the ssh-agent service (OpenSSH Authentication Agent) running?")
+			log.WithError(err).Debug("could not connect to openssh-ssh-agent pipe, is the ssh-agent service (OpenSSH Authentication Agent) running?")
 		})
 	}
 	return nil
