@@ -20,11 +20,38 @@ import (
 	"fmt"
 	"github.com/mgutz/ansi"
 	"github.com/sirupsen/logrus"
+	"runtime"
 )
 
+var log *logrus.Logger
+
 func init() {
-	logrus.SetFormatter(&logrusFormatter{})
+	log = logrus.New()
+	fmter := &logrus.TextFormatter{
+		ForceColors:               true,
+		DisableColors:             false,
+		ForceQuote:                false,
+		DisableQuote:              false,
+		EnvironmentOverrideColors: false,
+		DisableTimestamp:          true,
+		FullTimestamp:             false,
+		TimestampFormat:           "",
+		DisableSorting:            true,
+		SortingFunc:               nil,
+		DisableLevelTruncation:    true,
+		PadLevelText:              true,
+		QuoteEmptyFields:          false,
+		FieldMap:                  nil,
+		CallerPrettyfier:          func(frame *runtime.Frame) (function string, file string) { return "", "" },
+	}
+
+	log.SetFormatter(fmter)
 }
+
+func Logger() *logrus.Logger {
+	return log
+}
+
 type logrusFormatter struct {
 }
 

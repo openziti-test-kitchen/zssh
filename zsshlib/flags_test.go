@@ -27,7 +27,7 @@ func getOsUser() string {
 	return u.Username
 }
 func TestParseUserName(t *testing.T) {
-	result := ParseUserName("user@hostname:port")
+	result := ParseUserName("user@hostname:port", true)
 	assert.Equal(t, result, "user", "user not correct")
 
 	var osUser string
@@ -37,13 +37,13 @@ func TestParseUserName(t *testing.T) {
 		osUser = getOsUser()
 	}
 
-	result = ParseUserName("hostname:port")
+	result = ParseUserName("hostname:port", true)
 	assert.Equal(t, result, osUser, "user not correct")
 
-	result = ParseUserName("hostname")
+	result = ParseUserName("hostname", true)
 	assert.Equal(t, result, osUser, "user not correct")
 
-	result = ParseUserName("user@hostname")
+	result = ParseUserName("user@hostname", true)
 	assert.Equal(t, result, "user", "user not correct")
 }
 func TestParseFilePath(t *testing.T) {

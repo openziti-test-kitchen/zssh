@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
@@ -24,7 +23,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 	if flags.OIDC.Mode {
 		oidcToken, oidcErr = OIDCFlow(context.Background(), flags)
 		if oidcErr != nil {
-			logrus.Fatalf("error performing OIDC flow: %v", oidcErr)
+			log.Fatalf("error performing OIDC flow: %v", oidcErr)
 		}
 	}
 	var ctx ziti.Context
@@ -32,7 +31,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 		conf := getConfig(flags.ZConfig)
 		c, err := ziti.NewContext(conf)
 		if err != nil {
-			logrus.Fatalf("error creating ziti context: %v", err)
+			log.Fatalf("error creating ziti context: %v", err)
 		}
 		ctx = c
 		conf.Credentials.AddJWT(oidcToken)
@@ -43,7 +42,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 		}
 		caPool, err := ziti.GetControllerWellKnownCaPool(ozController)
 		if err != nil {
-			logrus.Fatalf("error creating ziti context: %v", err)
+			log.Fatalf("error creating ziti context: %v", err)
 		}
 
 		credentials := edgeapis.NewJwtCredentials(oidcToken)
@@ -56,7 +55,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 
 		c, ctxErr := ziti.NewContext(cfg)
 		if ctxErr != nil {
-			logrus.Fatalf("error creating ziti context: %v", ctxErr)
+			log.Fatalf("error creating ziti context: %v", ctxErr)
 		}
 		ctx = c
 	}
@@ -81,8 +80,8 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 
 func Auth(ctx ziti.Context) {
 	if err := ctx.Authenticate(); err != nil {
-		logrus.Errorf("error creating ziti context: %v", err)
-		logrus.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
+		log.Errorf("error creating ziti context: %v", err)
+		log.Fatalf("could not authenticate. verify your identity is correct and matches all necessary authentication conditions.")
 	}
 }
 

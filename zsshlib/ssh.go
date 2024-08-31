@@ -24,7 +24,6 @@ import (
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -367,7 +366,7 @@ func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Cli
 
 	_, ok := ctx.GetService(f.ServiceName)
 	if !ok {
-		logrus.Fatalf("service not found: %s", f.ServiceName)
+		log.Fatalf("service not found: %s", f.ServiceName)
 	}
 	dialOptions := &ziti.DialOptions{
 		ConnectTimeout: 0,
@@ -376,7 +375,7 @@ func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Cli
 	}
 	svc, err := ctx.DialWithOptions(f.ServiceName, dialOptions)
 	if err != nil {
-		logrus.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
+		log.Fatalf("error when dialing service name %s. %v", f.ServiceName, err)
 	}
 	username := ParseUserName(target, false)
 	if username == "" {
@@ -390,15 +389,9 @@ func EstablishClient(f *SshFlags, target string, targetIdentity string) *ssh.Cli
 	config := factory.Config()
 	sshConn, err := Dial(config, svc)
 	if err != nil {
-		logrus.Fatalf("error dialing SSH Conn: %v", err)
+		log.Fatalf("error dialing SSH Conn: %v", err)
 	}
 	return sshConn
-}
-
-func (f *SshFlags) DebugLog(msg string, args ...interface{}) {
-	if f.Debug {
-		logrus.Infof(msg, args...)
-	}
 }
 
 func getConfig(cfgFile string) (zitiCfg *ziti.Config) {
@@ -419,7 +412,7 @@ func AppendBaseName(c *sftp.Client, remotePath string, localPath string, debug b
 		if err == nil && info.IsDir() {
 			remotePath = filepath.Join(remotePath, localPath)
 		} else if debug {
-			logrus.Infof("Remote File/Directory: %s doesn't exist [%v]", remotePath, err)
+			log.Infof("Remote File/Directory: %s doesn't exist [%v]", remotePath, err)
 		}
 	}
 	return remotePath
@@ -441,7 +434,7 @@ func processOutput(stdout io.Reader, stderr io.Reader) {
 	// Goroutine to process stderr
 	go func() {
 		defer wg.Done()
-		if _, err := io.Copy(os.Stdout, stdout); err != nil {
+		if _, err := io.Copy(os.Stderr, stderr); err != nil {
 			log.Fatalf("Error copying stderr: %v", err)
 		}
 	}()

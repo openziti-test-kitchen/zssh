@@ -1,11 +1,9 @@
-package config
+package zsshlib
 
 import (
-	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
-
-	"gopkg.in/yaml.v2"
 )
 
 type OIDC struct {
@@ -106,7 +104,7 @@ func LoadConfigFile() ConfigMap {
 	configs, err := LoadConfigs(configFilePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logrus.Fatalf("Error loading config: %v", err)
+			Logger().Fatalf("Error loading config: %v", err)
 		}
 	}
 	return configs

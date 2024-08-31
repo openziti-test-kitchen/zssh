@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"zssh/config"
 	"zssh/zsshlib"
 
 	"github.com/pkg/sftp"
@@ -34,12 +33,10 @@ import (
 	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
-const ExpectedServiceAndExeName = "zssh"
-
 var flags = &zsshlib.ScpFlags{}
 var rootCmd = &cobra.Command{
-	Use: "zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path]\n" +
-		"Local to Remote: zscp [Local Path][...] <remoteUsername>@<targetIdentity>:[Remote Path]",
+	Use: "zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path] or " +
+		"zscp [Local Path] <remoteUsername>@<targetIdentity>:[Remote Path]",
 	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.MinimumNArgs(2),
@@ -71,11 +68,11 @@ var rootCmd = &cobra.Command{
 			if _, err := os.Stat(localFilePaths[i]); err != nil {
 				logrus.Fatal(err)
 			}
-			flags.DebugLog("           local path: %s", localFilePaths[i])
+			zsshlib.Logger().Debugf("           local path: %s", localFilePaths[i])
 		}
 
 		targetIdentity := zsshlib.ParseTargetIdentity(remoteFilePath)
-		cfg := config.FindConfigByKey(targetIdentity)
+		cfg := zsshlib.FindConfigByKey(targetIdentity)
 		zsshlib.Combine(cmd, &flags.SshFlags, cfg)
 
 		remoteFilePath = zsshlib.ParseFilePath(remoteFilePath)
@@ -117,9 +114,9 @@ var rootCmd = &cobra.Command{
 						if info.IsDir() {
 							err = client.Mkdir(remotePath)
 							if err != nil {
-								flags.DebugLog("%s", err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+								zsshlib.Logger().Debugf("%s", err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
 							} else {
-								flags.DebugLog("made directory: %s", remotePath)
+								zsshlib.Logger().Debugf("made directory: %s", remotePath)
 							}
 						} else {
 							err = zsshlib.SendFile(client, path, remotePath)
@@ -159,9 +156,9 @@ var rootCmd = &cobra.Command{
 						if walker.Stat().IsDir() {
 							err = os.Mkdir(localPath, os.ModePerm)
 							if err != nil {
-								flags.DebugLog("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
+								zsshlib.Logger().Debugf("failed to make directory: %s [%v]", localPath, err) //occurs when directories exist already. Is not fatal. Only logs when debug flag is set.
 							} else {
-								flags.DebugLog("made directory: %s", localPath)
+								zsshlib.Logger().Debugf("made directory: %s", localPath)
 							}
 						} else {
 							err = zsshlib.RetrieveRemoteFiles(client, localPath, walker.Path())
@@ -199,7 +196,7 @@ func after(value string, a string) string {
 	if adjustedPos >= len(value) {
 		return ""
 	}
-	return value[adjustedPos:len(value)]
+	return value[adjustedPos:]
 }
 
 func main() {
