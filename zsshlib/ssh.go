@@ -17,15 +17,19 @@
 package zsshlib
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
 	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
 	"github.com/zitadel/oidc/v2/pkg/oidc"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"io"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -292,7 +296,7 @@ func (factory *SshConfigFactoryImpl) Config() *ssh.ClientConfig {
 	return &ssh.ClientConfig{
 		User:            factory.user,
 		Auth:            factory.authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 	}
 }
 
@@ -441,4 +445,139 @@ func processOutput(stdout io.Reader, stderr io.Reader) {
 
 	// Wait for both goroutines to finish
 	wg.Wait()
+}
+
+type zitiEdgeConnAdapter struct {
+	orig net.Addr
+}
+
+func (a zitiEdgeConnAdapter) Network() string {
+	return ""
+}
+func (a zitiEdgeConnAdapter) String() string {
+	// ziti connections will have the format: "ziti-edge-router connId=%v, logical=%v", e.MsgCh.Id(), e.MsgCh.LogicalName()
+	// see ziti/edge/addr.go in github.com/openziti/sdk-golang if it changes
+	// example: ziti-edge-router connId=1, logical=ziti-sdk[router=tls:ec2-3-18-113-172.us-east-2.compute.amazonaws.com:8442]
+	parts := strings.Split(a.orig.String(), ":")
+	answer := strings.Join(parts[len(parts)-2:], ":")
+	answer = strings.ReplaceAll(answer, "]", "")
+	return answer
+}
+
+func keyToString(k ssh.PublicKey) string {
+	return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
+}
+
+func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	var keyErr *knownhosts.KeyError
+	remoteCopy := zitiEdgeConnAdapter{
+		orig: remote,
+	}
+
+	if err := ensureKnownHosts(); err != nil {
+		return err
+	}
+
+	knownHosts := knownHostsFile()
+	fmt.Println(remote.String())
+	cb, err := knownhosts.New(knownHosts)
+	if err != nil {
+		return err
+	}
+
+	err = cb(hostname, remoteCopy, key)
+	if err != nil {
+		if err.Error() == "knownhosts: key is unknown" {
+			log.Warnf("key is not known: %s", keyToString(key))
+			time.Sleep(50 * time.Millisecond)
+			fmt.Print("do you want to add this key to your known_hosts file? (N/y): ")
+
+			reader := bufio.NewReader(os.Stdin)
+			answer, readerr := reader.ReadString('\n')
+			if readerr != nil {
+				log.Fatalf("error reading line: %v", readerr)
+			}
+
+			if strings.ToLower(answer)[:1] == "y" {
+				adderr := addKnownHostUnhashed(remoteCopy.String(), key)
+				if adderr != nil {
+					log.Fatalf("error adding key to known_hosts: %v", adderr)
+				}
+				log.Infof("added key to known_hosts: %s", keyToString(key))
+
+				cb, err = knownhosts.New(knownHosts)
+				if err != nil {
+					return err
+				}
+				err = cb(hostname, remoteCopy, key)
+			} else {
+				os.Exit(1)
+			}
+		}
+	}
+
+	// Make sure that the error returned from the callback is host not in file error.
+	// If keyErr.Want is greater than 0 length, that means host is in file with different key.
+	if errors.As(err, &keyErr) && len(keyErr.Want) > 0 {
+		return keyErr
+	}
+
+	// Some other error occurred and safest way to handle is to pass it back to user.
+	if err != nil {
+		return err
+	}
+
+	// Key is not trusted because it is not in the file.
+	return nil
+}
+
+func ensureKnownHosts() error {
+	filePath := knownHostsFile()
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		// Create the directories if they don't exist
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return fmt.Errorf("failed to create directories: %w", err)
+		}
+
+		// Create the file with 0600 permissions
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to create file: %w", err)
+		}
+		defer file.Close()
+	} else if err != nil {
+		return fmt.Errorf("error checking file: %w", err)
+	}
+
+	return nil
+}
+
+func knownHostsFile() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("unable to determine home directory - cannot find known_hosts file: %v", err)
+	}
+	return path.Join(home, ".ssh", "known_hosts")
+}
+
+// couldn't get the openssh hashing to work yet. unhashed works and it's good enoguh for now.
+func addKnownHostUnhashed(hostname string, key ssh.PublicKey) error {
+	knownHosts := knownHostsFile()
+	f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	keyBytes := key.Marshal()
+	keyString := base64.StdEncoding.EncodeToString(keyBytes)
+	entry := fmt.Sprintf("%s %s %s\n", knownhosts.Normalize(hostname), key.Type(), keyString)
+
+	if _, err := f.WriteString(entry); err != nil {
+		return fmt.Errorf("failed to write to known_hosts file: %v", err)
+	}
+
+	return err
 }
