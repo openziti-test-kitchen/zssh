@@ -1,0 +1,733 @@
+/*
+	Copyright NetFoundry, Inc.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+	https://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+package zsshlib
+
+import (
+	"bufio"
+	"bytes"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base64"
+	"fmt"
+	"golang.org/x/crypto/ssh/knownhosts"
+	"net"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+)
+
+func newZitiEdgeConnAdapter(remote net.Addr) zitiEdgeConnAdapter {
+	remoteCopy := zitiEdgeConnAdapter{
+		orig: remote,
+	}
+	return remoteCopy
+}
+
+func trustedHostKeyCallback2(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	var keyErr *knownhosts.KeyError
+	if err := ensureKnownHosts(); err != nil {
+		return err
+	}
+
+	knownHosts := knownHostsFile()
+	fmt.Println(remote.String())
+	cb, err := knownhosts.New(knownHosts)
+	if err != nil {
+		return err
+	}
+
+	err = cb(hostname, newZitiEdgeConnAdapter(remote), key)
+	if err != nil {
+		if err.Error() == "knownhosts: key is unknown" {
+			log.Warnf("key is not known: %s", keyString(key))
+			time.Sleep(50 * time.Millisecond)
+			fmt.Print("do you want to add this key to your known_hosts file? N/y")
+
+			reader := bufio.NewReader(os.Stdin)
+			answer, readerr := reader.ReadString('\n')
+			if readerr != nil {
+				log.Fatalf("error reading line: %v", readerr)
+			}
+
+			if strings.ToLower(answer)[:1] == "y" {
+				adderr := addKnownHost_1106(newZitiEdgeConnAdapter(remote).String(), key)
+				if adderr != nil {
+					log.Fatalf("error adding key to known_hosts: %v", adderr)
+				}
+				log.Infof("added key to known_hosts: %s", keyString(key))
+			} else {
+				os.Exit(1)
+			}
+		}
+	}
+
+	// Make sure that the error returned from the callback is host not in file error.
+	// If keyErr.Want is greater than 0 length, that means host is in file with different key.
+	if errors.As(err, &keyErr) && len(keyErr.Want) > 0 {
+		return keyErr
+	}
+
+	// Some other error occurred and safest way to handle is to pass it back to user.
+	if err != nil {
+		return err
+	}
+
+	// Key is not trusted because it is not in the file.
+	return nil
+}
+
+func AddKnownHost2(host string, remote net.Addr, key ssh.PublicKey) (err error) {
+	knownHosts := knownHostsFile()
+
+	f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	remoteNormalized := knownhosts.Normalize(remote.String())
+	hostNormalized := knownhosts.Normalize(host)
+	addresses := []string{remoteNormalized}
+
+	if hostNormalized != remoteNormalized {
+		addresses = append(addresses, hostNormalized)
+	}
+
+	_, err = f.WriteString(knownhosts.Line(addresses, key) + "\n")
+
+	return err
+}
+
+func knownHostsFile2() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("unable to determine home directory - cannot find known_hosts file: %v", err)
+	}
+	return path.Join(home, ".ssh", "known_hosts")
+}
+
+func addKnownHost_11012(host string, key ssh.PublicKey) error {
+
+	keyValue := keyString(key)
+	entry, _, err := ConvertToHashedKnownHost(host, key.Type(), keyValue)
+	if err != nil {
+		log.Fatalf("Error converting to hashed known_hosts entry: %v", err)
+	}
+
+	// Open known_hosts file
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	file, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	// Write the entry
+	_, err = file.WriteString(entry)
+	if err != nil {
+		return fmt.Errorf("failed to write to known_hosts file: %w", err)
+	}
+
+	return nil
+
+	//// Parse the public key
+	//pubKey, _, _, _, errs := ssh.ParseAuthorizedKey([]byte(keyValue))
+	//if errs != nil {
+	//	return fmt.Errorf("failed to parse public key: %w", errs)
+	//}
+	//pubVal := keyString(pubKey)
+	//
+	//// Format the known_hosts entry
+	////hostLine := fmt.Sprintf("%s %s", host, pubKey.Type())
+	////keyLine := fmt.Sprintf("%s %s\n", hostLine, ssh.FingerprintSHA256(pubKey))
+	//
+	//// Format the known_hosts entry
+	//saltBase64 := ""
+	//hashedHostname := ""
+	////entry := fmt.Sprintf("|1|%s|%s %s %s\n", base64.StdEncoding.EncodeToString(salt), hashedHost, pubKey.Type(), base64.StdEncoding.EncodeToString(pubKey.Marshal()))
+	//keyLine := fmt.Sprintf("|1|%s|%s %s %s", saltBase64, hashedHostname, pubKey.Type(), pubVal)
+	//
+	//// Open known_hosts file
+	//knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	//file, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	//if err != nil {
+	//	return fmt.Errorf("failed to open known_hosts file: %w", err)
+	//}
+	//defer file.Close()
+	//
+	//// Write the entry
+	//_, err = file.WriteString(keyLine)
+	//if err != nil {
+	//	return fmt.Errorf("failed to write to known_hosts file: %w", err)
+	//}
+	//
+	//return nil
+}
+
+func ensureKnownHosts2() error {
+	filePath := knownHostsFile()
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		// Create the directories if they don't exist
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return fmt.Errorf("failed to create directories: %w", err)
+		}
+
+		// Create the file with 0600 permissions
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to create file: %w", err)
+		}
+		defer file.Close()
+	} else if err != nil {
+		return fmt.Errorf("error checking file: %w", err)
+	}
+
+	return nil
+}
+
+// AddHashedKnownHost adds a hashed known host entry to the known_hosts file
+func AddHashedKnownHost2(host, key string) error {
+	// Parse the public key
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	// Generate a random salt for hashing (for simplicity, we use a fixed salt here)
+	salt := []byte("random_salt_value") // In practice, use a cryptographically secure random salt
+
+	// Hash the hostname
+	hashedHost := HashHostname(host, salt)
+
+	// Format the known_hosts entry
+	entry := fmt.Sprintf("|1|%s|%s %s %s\n", base64.StdEncoding.EncodeToString(salt), hashedHost, pubKey.Type(), base64.StdEncoding.EncodeToString(pubKey.Marshal()))
+
+	// Open known_hosts file
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	file, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %w", err)
+	}
+	defer file.Close()
+
+	// Write the hashed entry
+	_, err = file.WriteString(entry)
+	if err != nil {
+		return fmt.Errorf("failed to write to known_hosts file: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateRandomSalt creates a 20-byte random salt
+func GenerateRandomSalt2() ([]byte, error) {
+	salt := make([]byte, 20)
+	_, err := rand.Read(salt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random salt: %w", err)
+	}
+	return salt, nil
+}
+
+// HashHostname hashes the hostname with HMAC-SHA1 using the provided salt
+func HashHostname2(hostname string, salt []byte) string {
+	h := hmac.New(sha1.New, salt)
+	h.Write([]byte(hostname))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// ConvertToHashedKnownHost formats the known_hosts entry with hashed hostname
+func ConvertToHashedKnownHost2(hostname, keyType, keyValue string) (string, string, error) {
+	// Generate random salt
+	salt, err := GenerateRandomSalt()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Hash the hostname
+	hashedHostname := HashHostname(hostname, salt)
+
+	// Encode the salt in base64
+	saltBase64 := base64.StdEncoding.EncodeToString(salt)
+
+	// Format the entry: |1|salt|hashed_hostname| key_type key_value
+	entry := fmt.Sprintf("|1|%s|%s %s %s", saltBase64, hashedHostname, keyType, keyValue)
+	return entry, saltBase64, nil
+}
+
+// Format the result as a |1|salt|hashed_hostname| key_type key_value entry for the known_hosts file.
+
+func addKnownHost_11022(hostname string, key ssh.PublicKey) error {
+	knownHosts := knownHostsFile()
+	f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	keyBytes := key.Marshal()
+	keyString := base64.StdEncoding.EncodeToString(keyBytes)
+	entry := fmt.Sprintf("%s %s %s\n", knownhosts.Normalize(hostname), key.Type(), keyString)
+
+	if _, err := f.WriteString(entry); err != nil {
+		return fmt.Errorf("failed to write to known_hosts file: %v", err)
+	}
+
+	//remoteNormalized := knownhosts.Normalize(remote.String())
+	//hostNormalized := knownhosts.Normalize(host)
+	//addresses := []string{remoteNormalized}
+	//
+	//if hostNormalized != remoteNormalized {
+	//	addresses = append(addresses, hostNormalized)
+	//}
+	//
+	//_, err = f.WriteString(knownhosts.Line(addresses, key) + "\n")
+
+	return err
+}
+
+func addKnownHost_11062(hostname string, key ssh.PublicKey) error {
+	knownHosts := knownHostsFile()
+	f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	keyValue := keyString(key)
+	pubKey, _, _, _, errs := ssh.ParseAuthorizedKey([]byte(keyValue))
+	if errs != nil {
+		return fmt.Errorf("failed to parse public key: %w", errs)
+	}
+	//pubVal := keyString(pubKey)
+
+	// Format the known_hosts entry with hashed hostname
+	hostPattern := knownhosts.HashHostname(hostname)
+	keyBytes := pubKey.Marshal()
+	keyString := base64.StdEncoding.EncodeToString(keyBytes)
+	entry := fmt.Sprintf("%s %s %s\n", hostPattern, pubKey.Type(), keyString)
+
+	if _, err := f.WriteString(entry); err != nil {
+		return fmt.Errorf("failed to write to known_hosts file: %v", err)
+	}
+
+	//remoteNormalized := knownhosts.Normalize(remote.String())
+	//hostNormalized := knownhosts.Normalize(host)
+	//addresses := []string{remoteNormalized}
+	//
+	//if hostNormalized != remoteNormalized {
+	//	addresses = append(addresses, hostNormalized)
+	//}
+	//
+	//_, err = f.WriteString(knownhosts.Line(addresses, key) + "\n")
+
+	return err
+}
+
+func hostKeyCallback_1113() ssh.HostKeyCallback {
+	knownHostsPath := knownHostsFile()
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		// If the file doesn't exist, create an empty callback
+		if os.IsNotExist(err) {
+			hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				return nil
+			}
+		} else {
+			// For other errors, we'll just print a warning and proceed with an empty callback
+			fmt.Printf("Warning: Error loading known_hosts file: %v\n", err)
+			hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				return nil
+			}
+		}
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := hostKeyCallback(hostname, remote, key)
+		if err == nil {
+			// Key is already known
+			return nil
+		}
+
+		// If this is a key mismatch, we should not proceed
+		var keyError *knownhosts.KeyError
+		if errors.As(err, &keyError) {
+			return err
+		}
+
+		// At this point, the host is unknown. Let's add it.
+		f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to open known_hosts file: %v", err)
+		}
+		defer f.Close()
+
+		// Generate the hashed entry
+		entry := knownhosts.Line([]string{hostname}, key)
+		if _, err := f.WriteString(entry + "\n"); err != nil {
+			return fmt.Errorf("failed to write to known_hosts file: %v", err)
+		}
+
+		return nil
+	}
+}
+
+func generateHashedHostname_1125(hostport string) string {
+	salt := make([]byte, 20)
+	_, err := rand.Read(salt)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate salt: %v", err))
+	}
+
+	hash := sha1.New()
+	hash.Write(salt)
+	hash.Write([]byte(hostport))
+	digest := hash.Sum(nil)
+
+	return fmt.Sprintf("|1|%s|%s", base64.StdEncoding.EncodeToString(salt), base64.StdEncoding.EncodeToString(digest))
+}
+
+func hostKeyCallback_1125() ssh.HostKeyCallback {
+	knownHostsPath := knownHostsFile()
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				return nil
+			}
+		} else {
+			fmt.Printf("Warning: Error loading known_hosts file: %v\n", err)
+			hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				return nil
+			}
+		}
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := hostKeyCallback(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+
+		if _, ok := err.(*knownhosts.KeyError); ok {
+			return err
+		}
+
+		f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to open known_hosts file: %v", err)
+		}
+		defer f.Close()
+
+		hashedEntry := generateHashedHostname_1125(hostname)
+		keyString := base64.StdEncoding.EncodeToString(key.Marshal())
+		entry := fmt.Sprintf("%s %s %s\n", hashedEntry, key.Type(), keyString)
+
+		if _, err := f.WriteString(entry); err != nil {
+			return fmt.Errorf("failed to write to known_hosts file: %v", err)
+		}
+
+		return nil
+	}
+}
+
+func hostKeyCallback_1132(knownHostsPath string) ssh.HostKeyCallback {
+	callback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// If the file doesn't exist, create it
+			if err := os.MkdirAll(filepath.Dir(knownHostsPath), 0700); err != nil {
+				panic(fmt.Sprintf("failed to create known_hosts directory: %v", err))
+			}
+			f, err := os.Create(knownHostsPath)
+			if err != nil {
+				panic(fmt.Sprintf("failed to create known_hosts file: %v", err))
+			}
+			f.Close()
+			callback, err = knownhosts.New(knownHostsPath)
+			if err != nil {
+				panic(fmt.Sprintf("failed to create empty known_hosts callback: %v", err))
+			}
+		} else {
+			panic(fmt.Sprintf("error loading known_hosts file: %v", err))
+		}
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := callback(newZitiEdgeConnAdapter(remote).String(), newZitiEdgeConnAdapter(remote), key)
+		if err == nil {
+			// Key already known
+			return nil
+		}
+
+		if keyErr, ok := err.(*knownhosts.KeyError); ok {
+			if len(keyErr.Want) > 0 {
+				// Key mismatch
+				return keyErr
+			}
+			// Key not found, add it
+			f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
+			if err != nil {
+				return fmt.Errorf("failed to open known_hosts file: %v", err)
+			}
+			defer f.Close()
+
+			// Generate the hashed entry
+			hostToWrite := knownhosts.Normalize(hostname)
+			if remote != nil {
+				hostToWrite = knownhosts.Normalize(hostname)
+			}
+			line := knownhosts.Line([]string{hostToWrite}, key)
+
+			if _, err := f.WriteString(line + "\n"); err != nil {
+				return fmt.Errorf("failed to append to known_hosts file: %v", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+// initializeKnownHosts ensures the known_hosts file exists and returns a callback
+func initializeKnownHosts1653(knownHostsPath string) (ssh.HostKeyCallback, error) {
+	callback, err := knownhosts.New(knownHostsPath)
+	if err == nil {
+		return callback, nil
+	}
+
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("error loading known_hosts file: %v", err)
+	}
+
+	// File doesn't exist, create it
+	if err := os.MkdirAll(filepath.Dir(knownHostsPath), 0700); err != nil {
+		return nil, fmt.Errorf("failed to create known_hosts directory: %v", err)
+	}
+	f, err := os.Create(knownHostsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create known_hosts file: %v", err)
+	}
+	f.Close()
+
+	return knownhosts.New(knownHostsPath)
+}
+
+// addHostKey adds a new host key to the known_hosts file
+func addHostKey1653(knownHostsPath, hostname string, remote net.Addr, key ssh.PublicKey) error {
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %v", err)
+	}
+	defer f.Close()
+
+	hostToWrite := knownhosts.Normalize(hostname)
+	//if remote != nil {
+	//	hostToWrite = knownhosts.Normalize(net.JoinHostPort(hostname, remote.(*net.TCPAddr).Port))
+	//}
+	line := knownhosts.Line([]string{hostToWrite}, key)
+
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return fmt.Errorf("failed to append to known_hosts file: %v", err)
+	}
+
+	return nil
+}
+
+// hostKeyCallback returns a HostKeyCallback function
+func hostKeyCallback1653(knownHostsPath string) ssh.HostKeyCallback {
+	callback, err := initializeKnownHosts1653(knownHostsPath)
+	if err != nil {
+		return nil
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := callback(hostname, remote, key)
+		if err == nil {
+			// Key already known
+			return nil
+		}
+
+		if keyErr, ok := err.(*knownhosts.KeyError); ok {
+			if len(keyErr.Want) > 0 {
+				// Key mismatch
+				return keyErr
+			}
+			// Key not found, add it
+			return addHostKey1653(knownHostsPath, hostname, remote, key)
+		}
+
+		return err
+	}
+}
+
+// addKnownHostEntry1702 adds a new host key to the known_hosts file
+func addKnownHostEntry1702(knownHostsPath, hostname string, remote net.Addr, key ssh.PublicKey) error {
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %v", err)
+	}
+	defer f.Close()
+
+	var hostToWrite string
+	if remote != nil {
+		// Check if we can get a port from the remote address
+		if addr, ok := remote.(*net.TCPAddr); ok {
+			hostToWrite = net.JoinHostPort(hostname, strconv.Itoa(addr.Port))
+		} else {
+			// If we can't get a port, just use the hostname
+			hostToWrite = hostname
+		}
+	} else {
+		hostToWrite = hostname
+	}
+
+	hostToWrite = knownhosts.Normalize(hostToWrite)
+	line := knownhosts.Line([]string{hostToWrite}, key)
+
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return fmt.Errorf("failed to append to known_hosts file: %v", err)
+	}
+
+	return nil
+}
+
+// addSSHHostKey1708 connects to an SSH server, retrieves its public key, and adds it to the known_hosts file
+func addSSHHostKey1708(knownHostsPath, host string, port int) error {
+	// Create a temporary callback to retrieve the host key
+	var hostKey ssh.PublicKey
+	hostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		hostKey = key
+		return nil
+	}
+
+	config := &ssh.ClientConfig{
+		User:            "placeholder", // We don't need a real user for key retrieval
+		Auth:            []ssh.AuthMethod{},
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         5 * time.Second,
+	}
+
+	// Connect to the SSH server
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to SSH server: %v", err)
+	}
+	client.Close()
+
+	// If we've reached this point, we have successfully retrieved the host key
+	if hostKey == nil {
+		return fmt.Errorf("failed to retrieve host key")
+	}
+
+	// Now add the key to the known_hosts file
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %v", err)
+	}
+	defer f.Close()
+
+	hostToWrite := knownhosts.Normalize(fmt.Sprintf("%s:%d", host, port))
+	line := knownhosts.Line([]string{hostToWrite}, hostKey)
+
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return fmt.Errorf("failed to append to known_hosts file: %v", err)
+	}
+
+	return nil
+}
+
+// addKnownHostEntry1722 adds a given hostname and public key to the known_hosts file
+func addKnownHostEntry1722(hostname string, key ssh.PublicKey) error {
+	knownHostsPath := knownHostsFile()
+	// Ensure the directory exists
+	err := os.MkdirAll(filepath.Dir(knownHostsPath), 0700)
+	if err != nil {
+		return fmt.Errorf("failed to create directory for known_hosts file: %v", err)
+	}
+
+	// Open the known_hosts file in append mode, create if it doesn't exist
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %v", err)
+	}
+	defer f.Close()
+
+	// Generate the line to be written
+	hostToWrite := knownhosts.HashHostname(hostname)
+	line := knownhosts.Line([]string{hostToWrite}, key)
+
+	// Write the line to the file
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return fmt.Errorf("failed to append to known_hosts file: %v", err)
+	}
+
+	return nil
+}
+
+// addKnownHostEntry1730 adds a given hostname and public key to the known_hosts file without creating duplicates
+func addKnownHostEntry1730(hostname string /*, remote net.Addr*/, privKey ssh.PublicKey) error {
+	knownHostsPath := knownHostsFile()
+	// Read the existing known_hosts file
+	existingData, err := os.ReadFile(knownHostsPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read known_hosts file: %v", err)
+	}
+
+	keyValue := keyString(privKey)
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyValue))
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	// Check if the key already exists
+	keyString := base64.StdEncoding.EncodeToString(pubKey.Marshal())
+	scanner := bufio.NewScanner(bytes.NewReader(existingData))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, keyString) {
+			// Key already exists, no need to add it again
+			return nil
+		}
+	}
+
+	// If we're here, the key doesn't exist, so let's add it
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file: %v", err)
+	}
+	defer f.Close()
+
+	// Generate the line to be written
+	hostToWrite := knownhosts.HashHostname(hostname)
+	line := knownhosts.Line([]string{hostToWrite}, pubKey)
+
+	// Write the line to the file
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return fmt.Errorf("failed to append to known_hosts file: %v", err)
+	}
+
+	return nil
+}
