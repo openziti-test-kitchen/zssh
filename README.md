@@ -8,7 +8,7 @@ of your needs. If you find you are missing a favorite feature - please open an i
 hear your feedback.
 
 Read about:
-* zssh - [https://blog.openziti.io/zitifying-scp](https://blog.openziti.io/zitifying-ssh)
+* zssh - [https://blog.openziti.io/zitifying-ssh](https://blog.openziti.io/zitifying-ssh)
 * zscp - [https://blog.openziti.io/zitifying-scp](https://blog.openziti.io/zitifying-scp)
 
 Explore the CLI yourself, or look through the CLI commands online to explore usage etc.
