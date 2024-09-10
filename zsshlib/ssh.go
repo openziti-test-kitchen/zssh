@@ -305,6 +305,10 @@ func sshAuthMethodFromFile(keyPath string) (ssh.AuthMethod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read zssh file [%s]: %w", keyPath, err)
 	}
+	_, _, _, _, pubkeyErr := ssh.ParseAuthorizedKey(content)
+	if pubkeyErr == nil {
+		log.Fatal("the provided key for ssh authentication is a public key, but a private key is required")
+	}
 
 	if signer, err := ssh.ParsePrivateKey(content); err == nil {
 		return ssh.PublicKeys(signer), nil

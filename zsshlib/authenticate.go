@@ -51,6 +51,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 			ZtAPI:       ozController + "/edge/client/v1",
 			Credentials: credentials,
 		}
+		credentials.AddJWT(oidcToken) // satisfy the ext-jwt-auth primary + secondary
 		cfg.ConfigTypes = append(cfg.ConfigTypes, "all")
 
 		c, ctxErr := ziti.NewContext(cfg)
