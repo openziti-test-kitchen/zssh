@@ -54,7 +54,7 @@ const (
 )
 
 var (
-	DefaultAuthScopes = "openid profile"
+	DefaultAuthScopes = "openid profile email"
 )
 
 func RemoteShell(client *ssh.Client, args []string) error {
