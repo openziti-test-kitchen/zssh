@@ -45,6 +45,11 @@ var rootCmd = &cobra.Command{
 		var localFilePaths []string
 		var isCopyToRemote bool
 
+		logrus.StandardLogger().Level = logrus.FatalLevel
+		if flags.Debug {
+			zsshlib.Logger().SetLevel(logrus.DebugLevel)
+		}
+
 		if strings.ContainsAny(args[0], ":") {
 			remoteFilePath = args[0]
 			localFilePaths = args[1:]

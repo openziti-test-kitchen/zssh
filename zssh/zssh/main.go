@@ -42,10 +42,14 @@ var rootCmd = &cobra.Command{
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		logrus.StandardLogger().Level = logrus.FatalLevel
 		if len(args) < 1 {
 			fmt.Println("You need to specify at least one positional argument")
 			os.Exit(1)
+		}
+
+		logrus.StandardLogger().Level = logrus.FatalLevel
+		if flags.Debug {
+			zsshlib.Logger().SetLevel(logrus.DebugLevel)
 		}
 
 		targetIdentity := zsshlib.ParseTargetIdentity(args[0])
