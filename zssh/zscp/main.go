@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	gendoc "github.com/openziti/cobra-to-md"
+	"github.com/openziti/cobra-to-md"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -33,12 +33,19 @@ import (
 	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
-var flags = &zsshlib.ScpFlags{}
+var (
+	flags   = zsshlib.ScpFlags{}
+	version = "v0.0.0"
+	commit	= "unknown"
+	date	= "unknown"
+)
+
 var rootCmd = &cobra.Command{
 	Use: "zscp <remoteUsername>@<targetIdentity>:[Remote Path] [Local Path] or " +
 		"zscp [Local Path] <remoteUsername>@<targetIdentity>:[Remote Path]",
 	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+	Version: fmt.Sprintf("%s (built: %s, hash: %s)", version, date, commit),
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		var remoteFilePath string
