@@ -61,16 +61,16 @@ jobs:
     - if: ${{ matrix.arch=='linux-arm' }}
       name: Install gcc for arm
       run: sudo apt-get install gcc-arm-linux-gnueabi -y
-      
+
     - if: ${{ matrix.arch=='linux-arm64' }}
       name: Install gcc for arm 64
       run: sudo apt-get install gcc-aarch64-linux-gnu -y
-      
+
     - name: Make the build dir
       run: mkdir "${{ runner.workspace }}/build"
-      
+
     - name: Build
-      run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build ./...
+      run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build -ldflags "-X main.version=${{ github.ref }} -X main.commit=$(git rev-parse HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./...
 
     - name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
