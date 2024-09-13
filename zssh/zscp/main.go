@@ -45,7 +45,7 @@ var rootCmd = &cobra.Command{
 		"zscp [Local Path] <remoteUsername>@<targetIdentity>:[Remote Path]",
 	Short: "Z(iti)scp, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)scp is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-	Version: fmt.Sprintf("%s (built: %s, date: %s)", version, date, commit),
+	Version: fmt.Sprintf("%s (built: %s, hash: %s)", version, date, commit),
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		var remoteFilePath string

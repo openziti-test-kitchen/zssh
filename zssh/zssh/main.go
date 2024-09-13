@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Use:   fmt.Sprintf("%s %s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName, flags.ServiceName),
 	Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
 	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-	Version: fmt.Sprintf("%s (built: %s, date: %s)", version, date, commit),
+	Version: fmt.Sprintf("%s (built: %s, hash: %s)", version, date, commit),
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
