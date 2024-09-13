@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	gendoc "github.com/openziti/cobra-to-md"
+	"github.com/openziti/cobra-to-md"
 	"io/fs"
 	"os"
 	"path/filepath"
