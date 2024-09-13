@@ -58,6 +58,17 @@ jobs:
       with:
         go-version: 1.22
 
+    # Get the Git commit hash and build date
+    - name: Get Git commit hash
+      id: vars
+      run: |
+        echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+
+    # Get the latest Git tag for versioning
+    - name: Get Git tag
+      run: echo "VERSION=$(git describe --tags --always)" >> $GITHUB_ENV
+
     - if: ${{ matrix.arch=='linux-arm' }}
       name: Install gcc for arm
       run: sudo apt-get install gcc-arm-linux-gnueabi -y
@@ -70,7 +81,7 @@ jobs:
       run: mkdir "${{ runner.workspace }}/build"
 
     - name: Build
-      run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build -ldflags "-X main.version=${{ github.ref }} -X main.commit=$(git rev-parse HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./...
+      run: ${{ matrix.go_opts }} go build -o ${{ runner.workspace }}/build -ldflags "-X main.version=$VERSION -X main.commit=$COMMIT_HASH -X main.date=$BUILD_DATE" ./...
 
     - name: Upload zssh binaries to release
       uses: svenstaro/upload-release-action@v2
