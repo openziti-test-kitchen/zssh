@@ -35,16 +35,16 @@ const ExpectedServiceAndExeName = "zssh"
 var (
 	flags   = zsshlib.SshFlags{}
 	version = "v0.0.0"
-	commit	= "unknown"
-	date	= "unknown"
+	commit  = "unknown"
+	date    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   fmt.Sprintf("%s %s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName, flags.ServiceName),
-	Short: "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
-	Long:  "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
-	Version: fmt.Sprintf("%s (built: %s, hash: %s)", version, date, commit),
-	Args:  cobra.MinimumNArgs(1),
+	Use:     fmt.Sprintf("%s %s <remoteUsername>@<targetIdentity>", ExpectedServiceAndExeName, flags.ServiceName),
+	Short:   "Z(iti)ssh, Carb-loaded ssh performs faster and stronger than ssh",
+	Long:    "Z(iti)ssh is a version of ssh that utilizes a ziti network to provide a faster and more secure remote connection. A ziti connection must be established before use",
+	Version: fmt.Sprintf("%s (built:%s, hash:%s)", version, date, commit),
+	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
 			fmt.Println("You need to specify at least one positional argument")
