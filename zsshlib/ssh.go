@@ -483,7 +483,7 @@ func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error 
 	}
 
 	knownHosts := knownHostsFile()
-	fmt.Println(remote.String())
+	
 	cb, err := knownhosts.New(knownHosts)
 	if err != nil {
 		return err
