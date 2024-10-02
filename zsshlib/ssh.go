@@ -203,7 +203,7 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 
 	select {
 	case tokens := <-resultChan:
-		return tokens.IDToken, nil
+		return tokens.AccessToken, nil
 	case <-ctx.Done():
 		return "", errors.New("Timeout: OIDC authentication took too long")
 	}
@@ -483,7 +483,7 @@ func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error 
 	}
 
 	knownHosts := knownHostsFile()
-	
+
 	cb, err := knownhosts.New(knownHosts)
 	if err != nil {
 		return err
