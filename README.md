@@ -74,7 +74,7 @@ OpenZiti overlay network, hopefully making them easy to find if needed.
     ext_signer_name="keycloak-ext-jwt-signer"
     oidc_issuer="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
     jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
-    aud="openziti-client"
+    aud="openziti"
     claim="email"
     auth_policy_name="keycloak_auth_policy"
     private_key=
