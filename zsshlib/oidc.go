@@ -66,6 +66,11 @@ func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingP
 			parts := strings.Split(v, "=")
 			urlParamOpts = rp.WithURLParam(parts[0], parts[1])
 		}
+		if urlParamOpts == nil {
+			urlParamOpts = func() []oauth2.AuthCodeOption {
+				return []oauth2.AuthCodeOption{}
+			}
+		}
 		return func(w http.ResponseWriter, r *http.Request) {
 			rp.AuthURLHandler(func() string {
 				return uuid.New().String()
@@ -144,6 +149,7 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 
 	select {
 	case tokens := <-resultChan:
+		Logger().Infof("Refresh token: %s", tokens.RefreshToken)
 		return tokens.AccessToken, nil
 	case <-ctx.Done():
 		return "", errors.New("timeout: OIDC authentication took too long")
