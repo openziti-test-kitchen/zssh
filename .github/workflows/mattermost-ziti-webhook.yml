@@ -18,7 +18,7 @@ jobs:
   mattermost-ziti-webhook:
     runs-on: ubuntu-latest
     name: POST Webhook
-    if: github.repository_owner == 'openziti' && github.actor != 'dependabot[bot]'
+    if: github.repository_owner == 'openziti-test-kitchen' && github.actor != 'dependabot[bot]'
     env:
       ZITI_LOG: 99
       ZITI_NODEJS_LOG: 99
