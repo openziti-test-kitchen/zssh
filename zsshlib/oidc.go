@@ -55,7 +55,7 @@ func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingP
 
 	callback := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[C], state string, rp rp.RelyingParty) {
 		tokenChan <- tokens
-		msg := "<p><strong>Success!</strong></p>"
+		msg := "<script type=\"text/javascript\">window.close()</script><body onload=\"window.close()\">You may close this window</body><p><strong>Success!</strong></p>"
 		msg = msg + "<p>You are authenticated and can now return to the CLI.</p>"
 		w.Write([]byte(msg))
 	}
