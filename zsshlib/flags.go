@@ -18,14 +18,15 @@ type SshFlags struct {
 }
 
 type OIDCFlags struct {
-	Mode          bool
-	Issuer        string
-	ClientID      string
-	ClientSecret  string
-	CallbackPort  string
-	AsAscii       bool
-	OIDCOnly      bool
-	ControllerUrl string
+	Mode                  bool
+	Issuer                string
+	ClientID              string
+	ClientSecret          string
+	CallbackPort          string
+	AsAscii               bool
+	OIDCOnly              bool
+	ControllerUrl         string
+	AdditionalLoginParams []string
 }
 
 type ScpFlags struct {
@@ -93,6 +94,7 @@ func (f *SshFlags) OIDCFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.OIDC.Mode, "oidc", "o", false, fmt.Sprintf("toggle OIDC mode. default: %t", defaults.OIDC.Enabled))
 	cmd.Flags().BoolVar(&f.OIDC.OIDCOnly, "oidcOnly", false, "toggle OIDC only mode. default: false")
 	cmd.Flags().StringVar(&f.OIDC.ControllerUrl, "controllerUrl", "", "the url of the controller to use. only used with --oidcOnly")
+	cmd.Flags().StringArrayVarP(&f.OIDC.AdditionalLoginParams, "additionalLoginParams", "l", []string{}, "Additional parameters to specify to the login. Can specify multiple times. Must be in the format of param=value")
 }
 
 func (f *SshFlags) AddCommonFlags(cmd *cobra.Command) {
