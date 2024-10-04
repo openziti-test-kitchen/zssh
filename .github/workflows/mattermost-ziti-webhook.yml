@@ -1,4 +1,4 @@
-name: ziti-mattermost-action-py
+name: mattermost-ziti-webhook
 on:
   create:
   delete:
@@ -14,24 +14,17 @@ on:
   release:
     types: [released]
   workflow_dispatch:
-
 jobs:
-  ziti-webhook:
+  mattermost-ziti-webhook:
     runs-on: ubuntu-latest
-    name: Ziti Mattermost Action - Py
+    name: POST Webhook
+    if: github.repository_owner == 'openziti' && github.actor != 'dependabot[bot]'
+    env:
+      ZITI_LOG: 99
+      ZITI_NODEJS_LOG: 99
     steps:
-    - uses: openziti/ziti-mattermost-action-py@main
-      if: ${{ env.ZHOOK_URL != null }}
-      env:
-          ZHOOK_URL: ${{ secrets.ZHOOK_URL }}
-      with:
-        # Identity JSON containing key to access a Ziti network
-        zitiId: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
-
-        # URL to post the payload. Note that the `zitiId` must provide access to a service 
-        # intercepting `my-mattermost-ziti-server`
-        webhookUrl: ${{ secrets.ZHOOK_URL }}
-
-        eventJson: ${{ toJson(github.event) }}
-        senderUsername: "GitHubZ"
-        destChannel: "dev-notifications"
+      - uses: openziti/ziti-webhook-action@main
+        with:
+          ziti-id: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
+          webhook-url: ${{ secrets.ZITI_MATTERMOST_WEBHOOK_URL }}
+          webhook-secret: ${{ secrets.ZITI_MATTERMOSTI_WEBHOOK_SECRET }}
