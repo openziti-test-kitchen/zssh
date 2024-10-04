@@ -18,14 +18,8 @@ package zsshlib
 
 import (
 	"bufio"
-	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/gorilla/securecookie"
-	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
-	"github.com/zitadel/oidc/v2/pkg/oidc"
-	"golang.org/x/crypto/ssh/knownhosts"
 	"io"
 	"net"
 	"os"
@@ -36,15 +30,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/securecookie"
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"github.com/zitadel/oidc/v2/pkg/client/rp"
-	httphelper "github.com/zitadel/oidc/v2/pkg/http"
-	"golang.org/x/oauth2"
-
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -138,75 +130,6 @@ func Dial(config *ssh.ClientConfig, conn net.Conn) (*ssh.Client, error) {
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil
-}
-
-// OIDCConfig represents a config for the OIDC auth flow.
-type OIDCConfig struct {
-	// CallbackPath is the path of the callback handler.
-	CallbackPath string
-
-	// CallbackPort is the port of the callback handler.
-	CallbackPort string
-
-	// Issuer is the URL of the OpenID Connect provider.
-	Issuer string
-
-	// HashKey is used to authenticate values using HMAC.
-	HashKey []byte
-
-	// BlockKey is used to encrypt values using AES.
-	BlockKey []byte
-
-	// IDToken is the ID token returned by the OIDC provider.
-	IDToken string
-
-	// Logger function for debug.
-	Logf func(format string, args ...interface{})
-
-	oauth2.Config
-}
-
-// GetToken starts a local HTTP server, opens the web browser to initiate the OIDC Discovery and
-// Token Exchange flow, blocks until the user completes authentication and is redirected back, and returns
-// the OIDC tokens.
-func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
-	if err := config.validateAndSetDefaults(); err != nil {
-		return "", fmt.Errorf("invalid config: %w", err)
-	}
-
-	cookieHandler := httphelper.NewCookieHandler(config.HashKey, config.BlockKey, httphelper.WithUnsecure())
-
-	options := []rp.Option{
-		rp.WithCookieHandler(cookieHandler),
-		rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
-	}
-	if config.ClientSecret == "" {
-		options = append(options, rp.WithPKCE(cookieHandler))
-	}
-
-	relyingParty, err := rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
-	if err != nil {
-		logrus.Fatalf("error creating relyingParty %s", err.Error())
-	}
-
-	//ctx := context.Background()
-	state := func() string {
-		return uuid.New().String()
-	}
-
-	resultChan := make(chan *oidc.Tokens[*oidc.IDTokenClaims])
-
-	go func() {
-		tokens := cli.CodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config.CallbackPath, config.CallbackPort, state)
-		resultChan <- tokens
-	}()
-
-	select {
-	case tokens := <-resultChan:
-		return tokens.AccessToken, nil
-	case <-ctx.Done():
-		return "", errors.New("Timeout: OIDC authentication took too long")
-	}
 }
 
 // validateAndSetDefaults validates the config and sets default values.

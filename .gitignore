@@ -4,4 +4,5 @@ build
 zssh*json
 .run
 ziti-edge-tunnel*
-my.env
+*.env
+
