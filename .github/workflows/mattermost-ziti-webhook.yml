@@ -23,19 +23,7 @@ jobs:
     steps:
       - uses: dovholuknf/mm-notification-action@main
         if: ${{ env.ZHOOK_URL != null }}
-        env:
-          ZHOOK_URL: ${{ secrets.ZHOOK_URL }}
         with:
-          # Identity JSON containing key to access a Ziti network
-          zitiId: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
-          
-          # URL to post the payload. Note that the `zitiId` must provide access to a service 
-          # intercepting `my-mattermost-ziti-server`
-          webhookUrl: ${{ secrets.ZHOOK_URL }}
-          
-          eventJson: ${{ toJson(github.event) }}
-          senderUsername: "GitHubZ"
-          destChannel: "dev-notifications"
-          githubEvent:  ${{ toJson(github.event) }}
           identityFile: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
+          githubEvent:  ${{ toJson(github.event) }}
           url: ${{ secrets.ZHOOK_URL }}
