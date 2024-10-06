@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Ziti Mattermost Action - Py
     steps:
-      - uses: openziti/ziti-mattermost-action-py@roll-back-ziti-sdk-py
+      - uses: dovholuknf/mm-notification-action@main
         if: ${{ env.ZHOOK_URL != null }}
         env:
           ZHOOK_URL: ${{ secrets.ZHOOK_URL }}
@@ -36,3 +36,6 @@ jobs:
           eventJson: ${{ toJson(github.event) }}
           senderUsername: "GitHubZ"
           destChannel: "dev-notifications"
+          githubEvent:  ${{ toJson(github.event) }}
+          identityFile: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
+          url: ${{ secrets.ZHOOK_URL }}
