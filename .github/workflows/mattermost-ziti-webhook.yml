@@ -22,7 +22,6 @@ jobs:
     name: Ziti Mattermost Action - Py
     steps:
       - uses: dovholuknf/mm-notification-action@main
-        if: ${{ env.ZHOOK_URL != null }}
         with:
           identityFile: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
           githubEvent:  ${{ toJson(github.event) }}
