@@ -149,7 +149,7 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 
 	select {
 	case tokens := <-resultChan:
-		Logger().Infof("Refresh token: %s", tokens.RefreshToken)
+		Logger().Debugf("Refresh token: %s", tokens.RefreshToken)
 		return tokens.AccessToken, nil
 	case <-ctx.Done():
 		return "", errors.New("timeout: OIDC authentication took too long")
