@@ -41,7 +41,6 @@ func OIDCFlow(initialContext context.Context, flags *SshFlags) (string, error) {
 		return "", err
 	}
 
-	log.Debugf("ID token: %s", token)
 	log.Infof("OIDC auth flow succeeded")
 
 	return token, nil
@@ -149,8 +148,9 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 
 	select {
 	case tokens := <-resultChan:
-		Logger().Debugf("Refresh token: %s", tokens.RefreshToken)
-		Logger().Debugf("Access token: %s", tokens.AccessToken)
+		log.Debugf("ID token: %s", tokens.IDToken)
+		log.Debugf("Refresh token: %s", tokens.RefreshToken)
+		log.Debugf("Access token: %s", tokens.AccessToken)
 		return tokens.AccessToken, nil
 	case <-ctx.Done():
 		return "", errors.New("timeout: OIDC authentication took too long")
