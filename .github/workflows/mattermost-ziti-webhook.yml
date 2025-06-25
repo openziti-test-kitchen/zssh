@@ -1,28 +1,28 @@
-
-name: ziti-mattermost-action-py
+name: mattermost-ziti-webhook
 on:
   create:
   delete:
   issues:
   issue_comment:
   pull_request_review:
-    types: [submitted]
   pull_request_review_comment:
   pull_request:
-    types: [opened, reopened]
   push:
   fork:
   release:
-    types: [released]
-  workflow_dispatch:
 
 jobs:
-  ziti-webhook:
-    runs-on: ubuntu-latest
-    name: Ziti Mattermost Action - Py
+  mattermost-ziti-webhook:
+    runs-on: ubuntu-24.04
+    name: POST Webhook
+    if: github.repository_owner == 'openziti-test-kitchen' && github.actor != 'dependabot[bot]'
+    env:
+      ZITI_LOG: 99
+      ZITI_NODEJS_LOG: 99
     steps:
-      - uses: dovholuknf/mm-notification-action@main
+      - uses: openziti/ziti-webhook-action@main
         with:
-          identityFile: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
-          githubEvent:  ${{ toJson(github.event) }}
-          url: ${{ secrets.ZHOOK_URL }}
+          ziti-id: ${{ secrets.ZITI_MATTERMOST_IDENTITY_2025 }}
+          webhook-url: ${{ secrets.ZITI_MATTERMOST_WEBHOOK_URL }}
+          webhook-secret: ${{ secrets.ZITI_MATTERMOSTI_WEBHOOK_SECRET }}
+
