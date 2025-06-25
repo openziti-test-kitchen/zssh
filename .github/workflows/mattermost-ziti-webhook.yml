@@ -23,7 +23,7 @@ jobs:
         && ((github.event_name != 'pull_request_review')
         || (github.event_name == 'pull_request_review' && github.event.review.state == 'approved'))
       with:
-        zitiId: ${{ secrets.ZITI_MATTERMOST_IDENTITY_2025 }}
+        zitiId: ${{ secrets.ZITI_MATTERMOST_IDENTITY_2025_NF }}
         webhookUrl: ${{ secrets.ZITI_MATTERMOST_WEBHOOK_URL }}
         webhook-secret: ${{ secrets.ZITI_MATTERMOSTI_WEBHOOK_SECRET }}
         eventJson: ${{ toJson(github.event) }}
