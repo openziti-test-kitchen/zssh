@@ -11,18 +11,21 @@ on:
   fork:
   release:
 
+
 jobs:
   mattermost-ziti-webhook:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     name: POST Webhook
-    if: github.repository_owner == 'openziti-test-kitchen' && github.actor != 'dependabot[bot]'
-    env:
-      ZITI_LOG: 99
-      ZITI_NODEJS_LOG: 99
     steps:
-      - uses: openziti/ziti-webhook-action@main
-        with:
-          ziti-id: ${{ secrets.ZITI_MATTERMOST_IDENTITY_2025 }}
-          webhook-url: ${{ secrets.ZITI_MATTERMOST_WEBHOOK_URL }}
-          webhook-secret: ${{ secrets.ZITI_MATTERMOSTI_WEBHOOK_SECRET }}
-
+    - uses: openziti/ziti-mattermost-action-py@main
+      if: |
+        github.repository_owner == 'openziti-test-kitchen'
+        && ((github.event_name != 'pull_request_review')
+        || (github.event_name == 'pull_request_review' && github.event.review.state == 'approved'))
+      with:
+        zitiId: ${{ secrets.ZITI_MATTERMOST_IDENTITY }}
+        webhookUrl: ${{ secrets.ZITI_MATTERMOST_WEBHOOK_URL }}
+        webhook-secret: ${{ secrets.ZITI_MATTERMOSTI_WEBHOOK_SECRET }}
+        eventJson: ${{ toJson(github.event) }}
+        senderUsername: "GitHubZ"
+        destChannel: "dev-notifications"
