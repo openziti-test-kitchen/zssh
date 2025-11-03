@@ -97,7 +97,7 @@ func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingP
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Debugf("Server shutdown warning. Took too long to shutDown: %v", err)
+			log.Debugf("Server shutdown warning. Took too long to shutdown: %v", err)
 		}
 	}()
 
