@@ -80,7 +80,12 @@ jobs:
 
     - if: ${{ matrix.arch=='linux-arm64' }}
       name: Install gcc for arm 64
-      run: sudo apt-get install gcc-aarch64-linux-gnu -y
+      run: |
+        sudo sed -i '/mirror+file/d' /etc/apt/sources.list || true
+        sudo rm -f /etc/apt/sources.list.d/*mirror* || true
+        sudo apt-get clean
+        sudo apt-get update
+        sudo apt-get install gcc-aarch64-linux-gnu -y
 
     - name: Make the build dir
       run: mkdir "${{ runner.workspace }}/build"
