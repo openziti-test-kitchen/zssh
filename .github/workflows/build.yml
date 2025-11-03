@@ -69,9 +69,12 @@ jobs:
     - name: Get Git tag
       run: echo "VERSION=$(git describe --tags --always)" >> $GITHUB_ENV
 
-    - if: ${{ matrix.arch=='linux-arm' }}
+    - if: ${{ matrix.arch == 'linux-arm' }}
       name: Install gcc for arm
-      run: sudo apt-get install gcc-arm-linux-gnueabi -y
+      run: |
+        sudo rm -f /etc/apt/apt-mirrors.txt
+        sudo apt-get update
+        sudo apt-get install gcc-arm-linux-gnueabi -y
 
     - if: ${{ matrix.arch=='linux-arm64' }}
       name: Install gcc for arm 64
