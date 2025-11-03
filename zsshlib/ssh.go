@@ -145,7 +145,7 @@ func (c *OIDCConfig) validateAndSetDefaults() error {
 		c.Logf = func(string, ...interface{}) {}
 	}
 
-	c.Scopes = strings.Split(DefaultAuthScopes, " ")
+	c.Scopes = append(c.Scopes, strings.Split(DefaultAuthScopes, " ")...)
 
 	return nil
 }
