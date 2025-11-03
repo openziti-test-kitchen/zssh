@@ -33,8 +33,9 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 		if err != nil {
 			log.Fatalf("error creating ziti context: %v", err)
 		}
+
 		ctx = c
-		conf.Credentials.AddJWT(oidcToken)
+		conf.Credentials.AddJWT(oidcToken) // for secondary auth if any
 	} else {
 		ozController := flags.OIDC.ControllerUrl
 		if !strings.Contains(ozController, "://") {
@@ -48,7 +49,7 @@ func NewContext(flags *SshFlags, enableMfaListener bool) ziti.Context {
 		credentials := edgeapis.NewJwtCredentials(oidcToken)
 		credentials.CaPool = caPool
 		cfg := &ziti.Config{
-			ZtAPI:       ozController + "/edge/client/v1",
+			ZtAPI:       strings.TrimRight(ozController, "/") + "/edge/client/v1",
 			Credentials: credentials,
 		}
 		credentials.AddJWT(oidcToken) // satisfy the ext-jwt-auth primary + secondary

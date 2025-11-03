@@ -19,6 +19,8 @@ package main
 import (
 	"fmt"
 	"github.com/openziti/cobra-to-md"
+	"github.com/openziti/ziti/ziti/enroll"
+
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -29,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
@@ -214,7 +215,7 @@ func after(value string, a string) string {
 func main() {
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
 	flags.AddCommonFlags(rootCmd)
-	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(enroll.NewEnrollIdentityCommand(p))
 	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags.SshFlags))
 	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	e := rootCmd.Execute()

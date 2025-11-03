@@ -15,6 +15,15 @@ Explore the CLI yourself, or look through the CLI commands online to explore usa
 * [zssh usage](./docs/zssh/zssh.md)
 * [zscp usage](./docs/zscp/zscp.md)
 
+## Building the Binaries
+Make a directory you want the binaries to build into such as `build` and then from the checkout root run:
+* go build -o build/zssh zssh/zssh/main.go
+* go build -o build/zscp zssh/zscp/main.go
+
+Alternatively put the binaries on your gopath with:
+* go install ./zssh/zssh
+* go install ./zssh/zscp
+
 ## Prerequisites - Configuring the Overlay
 
 The steps below will show you how to test/use `zssh` or `zscp` entirely locally. The steps rely on using the 
@@ -72,8 +81,8 @@ OpenZiti overlay network, hopefully making them easy to find if needed.
     YOUR_EMAIL_ADDRESS=
 
     ext_signer_name="keycloak-ext-jwt-signer"
-    oidc_issuer="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm"
-    jwks="https://keycloak.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
+    oidc_issuer="https://keycloak.zrok.clint.demo.openziti.org:8446/realms/zitirealm"
+    jwks="https://keycloak.zrok.clint.demo.openziti.org:8446/realms/zitirealm/protocol/openid-connect/certs"
     aud="openziti"
     claim="email"
     auth_policy_name="keycloak_auth_policy"
@@ -131,6 +140,9 @@ policies: certificate, certificate with secondary OIDC, OIDC only:
 
 With the service created and authorized, two identities will be necessary. One identity will bind the ssh service
 and the other identity will be used to dial the service and connect to the sshd service.
+
+    ziti edge delete identity "${server_identity}"
+    ziti edge delete identity "${client_identity}"
 
     # create two identities, one to host sshd - one to connect to sshd
     ziti edge create identity "${server_identity}" \

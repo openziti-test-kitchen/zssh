@@ -22,11 +22,11 @@ import (
 	"os"
 	"zssh/zsshlib"
 
+	"github.com/openziti/ziti/ziti/enroll"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openziti/cobra-to-md"
-	"github.com/openziti/ziti/common/enrollment"
 	"github.com/openziti/ziti/ziti/cmd/common"
 )
 
@@ -102,7 +102,7 @@ func main() {
 	rootCmd.AddCommand(zsshlib.NewMfaCmd(&flags))
 	rootCmd.AddCommand(gendoc.NewGendocCmd(rootCmd))
 	p := common.NewOptionsProvider(os.Stdout, os.Stderr)
-	rootCmd.AddCommand(enrollment.NewEnrollCommand(p))
+	rootCmd.AddCommand(enroll.NewEnrollIdentityCommand(p))
 
 	// leave out for now // rootCmd.AddCommand(NewAuthCmd(p))
 	e := rootCmd.Execute()

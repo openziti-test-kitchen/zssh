@@ -2,6 +2,8 @@ package zsshlib
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/zitadel/oidc/v2/pkg/client/rp"
-	"github.com/zitadel/oidc/v2/pkg/client/rp/cli"
-	httphelper "github.com/zitadel/oidc/v2/pkg/http"
-	"github.com/zitadel/oidc/v2/pkg/oidc"
+	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	"github.com/zitadel/oidc/v3/pkg/client/rp/cli"
+	httphelper "github.com/zitadel/oidc/v3/pkg/http"
+	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"golang.org/x/oauth2"
 )
 
@@ -47,8 +49,6 @@ func OIDCFlow(initialContext context.Context, flags *SshFlags) (string, error) {
 }
 
 func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingParty, config *OIDCConfig) *oidc.Tokens[C] {
-	codeflowCtx, codeflowCancel := context.WithCancel(ctx)
-	defer codeflowCancel()
 
 	tokenChan := make(chan *oidc.Tokens[C], 1)
 
@@ -79,8 +79,7 @@ func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingP
 
 	http.Handle("/login", authHandlerWithQueryState(relyingParty))
 	http.Handle(config.CallbackPath, rp.CodeExchangeHandler(callback, relyingParty))
-
-	httphelper.StartServer(codeflowCtx, ":"+config.CallbackPort)
+	httphelper.StartServer(ctx, ":"+config.CallbackPort)
 
 	cli.OpenBrowser("http://localhost:" + config.CallbackPort + "/login")
 
@@ -134,7 +133,7 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 		options = append(options, rp.WithPKCE(cookieHandler))
 	}
 
-	relyingParty, err := rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
+	relyingParty, err := rp.NewRelyingPartyOIDC(ctx, config.Issuer, config.ClientID, config.ClientSecret, config.RedirectURL, config.Scopes, options...)
 	if err != nil {
 		logrus.Fatalf("error creating relyingParty %s", err.Error())
 	}
@@ -142,17 +141,51 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 	resultChan := make(chan *oidc.Tokens[*oidc.IDTokenClaims])
 
 	go func() {
-		tokens := zsshCodeFlow[*oidc.IDTokenClaims](ctx, relyingParty, config)
+		codeflowCtx := context.Background()
+		tokens := zsshCodeFlow[*oidc.IDTokenClaims](codeflowCtx, relyingParty, config)
 		resultChan <- tokens
+		codeflowCtx.Done()
 	}()
 
 	select {
 	case tokens := <-resultChan:
-		log.Debugf("ID token: %s", tokens.IDToken)
-		log.Debugf("Refresh token: %s", tokens.RefreshToken)
-		log.Debugf("Access token: %s", tokens.AccessToken)
+		log.Debugf("-- Refresh token: %s", tokens.RefreshToken)
+		PrintDecodedToken(tokens.RefreshToken)
+		log.Debugf("-- ID token: %s", tokens.IDToken)
+		PrintDecodedToken(tokens.IDToken)
+		log.Debugf("-- Access token: %s", tokens.AccessToken)
+		PrintDecodedToken(tokens.AccessToken)
 		return tokens.AccessToken, nil
 	case <-ctx.Done():
 		return "", errors.New("timeout: OIDC authentication took too long")
 	}
+}
+
+func PrintDecodedToken(token string) {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		log.Debugf("invalid token: %s", token)
+		return
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		log.Debugf("decode error: %v", err)
+		return
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		log.Debugf("json unmarshal error: %v", err)
+		log.Debugf("raw payload: %s", string(payloadBytes))
+		return
+	}
+
+	out, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		log.Errorf("json marshal error: %v", err)
+		return
+	}
+
+	log.Debugf("Decoded token:\n%s", string(out))
 }
