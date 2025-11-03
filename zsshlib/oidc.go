@@ -77,9 +77,29 @@ func zsshCodeFlow[C oidc.IDClaims](ctx context.Context, relyingParty rp.RelyingP
 		}
 	}
 
-	http.Handle("/login", authHandlerWithQueryState(relyingParty))
-	http.Handle(config.CallbackPath, rp.CodeExchangeHandler(callback, relyingParty))
-	httphelper.StartServer(ctx, ":"+config.CallbackPort)
+	mux := http.NewServeMux()
+	mux.Handle("/login", authHandlerWithQueryState(relyingParty))
+	mux.Handle(config.CallbackPath, rp.CodeExchangeHandler(callback, relyingParty))
+	server := &http.Server{
+		Addr:    ":" + config.CallbackPort,
+		Handler: mux,
+	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Errorf("ListenAndServe error: %v", err)
+		}
+	}()
+
+	// Shutdown on context cancellation
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Debugf("Server shutdown warning. Took too long to shutDown: %v", err)
+		}
+	}()
 
 	cli.OpenBrowser("http://localhost:" + config.CallbackPort + "/login")
 
@@ -141,10 +161,14 @@ func GetToken(ctx context.Context, config *OIDCConfig) (string, error) {
 	resultChan := make(chan *oidc.Tokens[*oidc.IDTokenClaims])
 
 	go func() {
-		codeflowCtx := context.Background()
+		codeflowCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		tokens := zsshCodeFlow[*oidc.IDTokenClaims](codeflowCtx, relyingParty, config)
-		resultChan <- tokens
-		codeflowCtx.Done()
+		select {
+		case resultChan <- tokens:
+		case <-codeflowCtx.Done():
+			// Context cancelled, exit without blocking
+		}
 	}()
 
 	select {
