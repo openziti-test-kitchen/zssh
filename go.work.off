@@ -1,0 +1,7 @@
+go 1.25.3
+
+use (
+	.
+	../../openziti/nf/edge-api
+	../../openziti/nf/sdk-golang
+)

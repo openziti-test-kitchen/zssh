@@ -142,14 +142,13 @@ With the service created and authorized, two identities will be necessary. One i
 and the other identity will be used to dial the service and connect to the sshd service.
 
     ziti edge delete identity "${server_identity}"
-    ziti edge delete identity "${client_identity}"
-
     # create two identities, one to host sshd - one to connect to sshd
     ziti edge create identity "${server_identity}" \
     -a "${service_name}.binders" \
     -o "${server_identity}.jwt"
     ziti edge enroll "${server_identity}.jwt"
-    
+
+    ziti edge delete identity "${client_identity}"
     ziti edge create identity "${client_identity}" \
     -a "${service_name}.dialers" \
     -o "${client_identity}.jwt" \
@@ -266,14 +265,14 @@ Example using client-based auth:
       -a "${oidc_issuer}" \
       -n openziti-client \
       -c "${client_identity}.json" \
-      -p 1234
+      -p $ZITI_CB_PORT
     
     zssh mfa remove \
       -o \
       -a "${oidc_issuer}" \
       -n openziti-client \
       -c "${client_identity}.json" \
-      -p 1234
+      -p $ZITI_CB_PORT
     
     zssh \
       -i "${private_key}" \
@@ -282,7 +281,7 @@ Example using client-based auth:
       -a "${oidc_issuer}" \
       -n openziti-client \
       -c "${client_identity}.json" \
-      -p 1234 \
+      -p $ZITI_CB_PORT \
       "${user_id}@${server_identity}"
 
 ## Other Examples
